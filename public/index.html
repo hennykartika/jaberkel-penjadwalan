@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jaberkel · Penjadwalan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ============ LAYAR LOGIN ============ -->
+  <div id="loginScreen" class="login">
+    <div class="login__panel">
+      <div class="login__brandmark">JB</div>
+      <h1 class="login__brandtitle">Jaberkel</h1>
+      <p class="login__brandsub">Sistem Penjadwalan Bimbingan Belajar</p>
+      <ul class="login__points">
+        <li>Atur jadwal mingguan secara visual</li>
+        <li>Deteksi bentrok guru &amp; ruangan otomatis</li>
+        <li>Publikasikan jadwal ke siswa &amp; guru</li>
+      </ul>
+      <p class="login__sig">Henny Kartika · 6026252017</p>
+    </div>
+
+    <div class="login__formwrap">
+      <div class="login__form">
+        <h2>Masuk</h2>
+        <p class="login__hint">Gunakan salah satu akun demo di bawah.</p>
+
+        <label class="field">
+          <span class="field__label">Username</span>
+          <input id="loginUser" class="field__input" type="text" placeholder="admin" autocomplete="username" />
+        </label>
+
+        <label class="field">
+          <span class="field__label">Password</span>
+          <input id="loginPass" class="field__input" type="password" placeholder="••••••••" autocomplete="current-password" />
+        </label>
+
+        <p id="loginError" class="login__err" hidden></p>
+
+        <button id="loginBtn" class="btn btn--primary btn--block">Masuk</button>
+
+        <div class="login__demo">
+          <button class="chip chip--admin" data-u="admin" data-p="admin123">
+            <strong>Admin</strong><span>admin / admin123 · bisa kelola</span>
+          </button>
+          <button class="chip chip--viewer" data-u="siswa" data-p="siswa123">
+            <strong>Siswa</strong><span>siswa / siswa123 · hanya lihat</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ APLIKASI ============ -->
+  <div id="app" class="app" hidden>
+    <header class="topbar">
+      <div class="topbar__brand">
+        <span class="topbar__mark">JB</span>
+        <span class="topbar__name">Jaberkel</span>
+        <span class="topbar__tag">Penjadwalan</span>
+      </div>
+      <div class="topbar__user">
+        <div class="topbar__userinfo">
+          <span id="userName" class="topbar__username"></span>
+          <span id="userRole" class="topbar__role"></span>
+        </div>
+        <div id="userAvatar" class="topbar__avatar"></div>
+        <button id="logoutBtn" class="btn btn--ghost btn--sm">Keluar</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- Judul + aksi -->
+      <div class="pagehead">
+        <div>
+          <h1 class="pagehead__title">Jadwal Pelajaran</h1>
+          <p class="pagehead__sub">Tahun ajaran berjalan · kelola slot waktu, ruangan, dan guru.</p>
+        </div>
+        <div class="pagehead__actions">
+          <button id="printBtn" class="btn btn--ghost">Cetak / PDF</button>
+          <button id="addBtn" class="btn btn--accent" hidden>+ Tambah Jadwal</button>
+        </div>
+      </div>
+
+      <!-- Statistik -->
+      <section class="stats" id="stats"></section>
+
+      <!-- Kontrol -->
+      <div class="controls">
+        <div class="search">
+          <svg class="search__icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="searchInput" class="search__input" type="text" placeholder="Cari mata pelajaran atau guru…" />
+        </div>
+        <div class="seg">
+          <button class="seg__btn is-active" data-view="grid">Mingguan</button>
+          <button class="seg__btn" data-view="list">Daftar</button>
+        </div>
+      </div>
+
+      <!-- Tampilan grid mingguan -->
+      <section id="gridView" class="board"></section>
+
+      <!-- Tampilan daftar -->
+      <section id="listView" class="listwrap" hidden></section>
+    </main>
+  </div>
+
+  <!-- ============ MODAL FORM ============ -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__card" role="dialog" aria-modal="true">
+      <div class="modal__head">
+        <h3 id="modalTitle">Tambah Jadwal</h3>
+        <button class="modal__x" data-close aria-label="Tutup">&times;</button>
+      </div>
+
+      <div class="modal__body">
+        <input type="hidden" id="fId" />
+        <label class="field">
+          <span class="field__label">Mata Pelajaran</span>
+          <input id="fSubject" class="field__input" type="text" placeholder="mis. Matematika Wajib" />
+        </label>
+        <label class="field">
+          <span class="field__label">Guru</span>
+          <input id="fTeacher" class="field__input" type="text" placeholder="mis. Drs. Bambang Wijaya" />
+        </label>
+        <label class="field">
+          <span class="field__label">Link Kelas Online</span>
+          <input id="fLink" class="field__input" type="url" placeholder="https://meet.google.com/abc-defg-hij" />
+        </label>
+        <div class="field__row">
+          <label class="field">
+            <span class="field__label">Hari</span>
+            <select id="fDay" class="field__input">
+              <option>Senin</option><option>Selasa</option><option>Rabu</option>
+              <option>Kamis</option><option>Jumat</option><option>Sabtu</option>
+            </select>
+          </label>
+        </div>
+        <div class="field__row">
+          <label class="field">
+            <span class="field__label">Jam Mulai</span>
+            <input id="fStart" class="field__input" type="time" value="08:00" />
+          </label>
+          <label class="field">
+            <span class="field__label">Jam Selesai</span>
+            <input id="fEnd" class="field__input" type="time" value="09:30" />
+          </label>
+        </div>
+
+        <div id="conflictHint" class="conflict" hidden></div>
+        <div id="formError" class="formerr" hidden></div>
+      </div>
+
+      <div class="modal__foot">
+        <button class="btn btn--ghost" data-close>Batal</button>
+        <button id="saveBtn" class="btn btn--primary">Simpan Jadwal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ KONFIRMASI HAPUS ============ -->
+  <div id="confirm" class="modal" hidden>
+    <div class="modal__backdrop" data-confirm-close></div>
+    <div class="modal__card modal__card--sm" role="dialog" aria-modal="true">
+      <div class="modal__head"><h3>Hapus Jadwal?</h3></div>
+      <div class="modal__body">
+        <p id="confirmText" class="confirm__text"></p>
+        <p class="confirm__warn">Tindakan ini tidak dapat dibatalkan.</p>
+      </div>
+      <div class="modal__foot">
+        <button class="btn btn--ghost" data-confirm-close>Batal</button>
+        <button id="confirmDelBtn" class="btn btn--danger">Ya, Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toasts" class="toasts"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
