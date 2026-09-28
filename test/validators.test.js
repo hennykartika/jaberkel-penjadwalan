@@ -12,31 +12,31 @@ const {
 } = require('../validators/schedule');
 
 const validBody = () => ({
-  subject: 'Matematika',
-  teacher: 'Pak Budi',
+  subject: 'Mathematics',
+  teacher: 'Mr. Budi',
   meeting_link: 'https://meet.google.com/abc-defg-hij',
-  day: 'Senin',
+  day: 'Monday',
   start_time: '08:00',
   end_time: '09:30',
 });
 
 test('accepts a valid schedule and normalizes it', () => {
-  const { errors, value } = validateSchedule({ ...validBody(), subject: '  Matematika  ' });
+  const { errors, value } = validateSchedule({ ...validBody(), subject: '  Mathematics  ' });
   assert.deepEqual(errors, []);
-  assert.equal(value.subject, 'Matematika');
+  assert.equal(value.subject, 'Mathematics');
   assert.equal(value.start_time, '08:00:00');
   assert.equal(value.end_time, '09:30:00');
 });
 
 test('trims names so a leading space cannot dodge the conflict check', () => {
-  const { value } = validateSchedule({ ...validBody(), teacher: '  Pak Budi' });
-  assert.equal(value.teacher, 'Pak Budi');
+  const { value } = validateSchedule({ ...validBody(), teacher: '  Mr. Budi' });
+  assert.equal(value.teacher, 'Mr. Budi');
 });
 
 test('compares times numerically, not as raw strings', () => {
   // "10:00" >= "9:00" is false as strings, which used to let this through.
   const reversed = validateSchedule({ ...validBody(), start_time: '10:00', end_time: '9:00' });
-  assert.ok(reversed.errors.includes('Jam mulai harus lebih awal dari jam selesai.'));
+  assert.ok(reversed.errors.includes('Start time must be earlier than end time.'));
 
   // "8:00" >= "10:00" is true as strings, which used to reject a valid slot.
   const valid = validateSchedule({ ...validBody(), start_time: '8:00', end_time: '10:00' });
@@ -58,13 +58,13 @@ test('rejects empty body and reports every missing field', () => {
 
 test('rejects non-string fields instead of coercing them', () => {
   const { errors } = validateSchedule({ ...validBody(), subject: { $gt: '' }, teacher: ['a'] });
-  assert.ok(errors.includes('Mata pelajaran (subject) harus berupa teks.'));
-  assert.ok(errors.includes('Guru (teacher) harus berupa teks.'));
+  assert.ok(errors.includes('Subject must be a string.'));
+  assert.ok(errors.includes('Teacher must be a string.'));
 });
 
 test('enforces column lengths', () => {
   const { errors } = validateSchedule({ ...validBody(), subject: 'x'.repeat(101) });
-  assert.ok(errors.includes('Mata pelajaran (subject) maksimal 100 karakter.'));
+  assert.ok(errors.includes('Subject must be at most 100 characters.'));
 });
 
 test('only accepts http and https meeting links', () => {
@@ -74,10 +74,10 @@ test('only accepts http and https meeting links', () => {
   }
 });
 
-test('accepts Senin to Sabtu only', () => {
-  assert.deepEqual(validateSchedule({ ...validBody(), day: 'Sabtu' }).errors, []);
-  assert.equal(validateSchedule({ ...validBody(), day: 'Minggu' }).errors.length, 1);
-  assert.equal(validateSchedule({ ...validBody(), day: 'senin' }).errors.length, 1);
+test('accepts Monday to Saturday only', () => {
+  assert.deepEqual(validateSchedule({ ...validBody(), day: 'Saturday' }).errors, []);
+  assert.equal(validateSchedule({ ...validBody(), day: 'Sunday' }).errors.length, 1);
+  assert.equal(validateSchedule({ ...validBody(), day: 'monday' }).errors.length, 1);
 });
 
 test('parseId accepts positive integers only', () => {

@@ -68,7 +68,7 @@
       }
     },
     {
-      "name": "Login as viewer (stores viewerToken)",
+      "name": "Login as student (stores viewerToken)",
       "event": [
         {
           "listen": "test",
@@ -102,7 +102,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"username\": \"siswa\",\n  \"password\": \"siswa123\"\n}",
+          "raw": "{\n  \"username\": \"student\",\n  \"password\": \"student123\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -145,7 +145,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"salah\"\n}",
+          "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"wrong-password\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -209,7 +209,7 @@
           }
         ],
         "url": {
-          "raw": "{{baseUrl}}/v1/schedules?q=Matematika",
+          "raw": "{{baseUrl}}/v1/schedules?q=Math",
           "host": [
             "{{baseUrl}}"
           ],
@@ -220,14 +220,14 @@
           "query": [
             {
               "key": "q",
-              "value": "Matematika"
+              "value": "Math"
             }
           ]
         }
       }
     },
     {
-      "name": "Viewer sees published schedules only",
+      "name": "Student sees published schedules only",
       "event": [
         {
           "listen": "test",
@@ -298,7 +298,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"subject\": \"Pemrograman Web\",\n  \"teacher\": \"Bu Henny\",\n  \"meeting_link\": \"https://meet.google.com/pemweb-01\",\n  \"day\": \"Jumat\",\n  \"start_time\": \"13:00\",\n  \"end_time\": \"15:00\"\n}",
+          "raw": "{\n  \"subject\": \"Web Programming\",\n  \"teacher\": \"Henny Kartika\",\n  \"meeting_link\": \"https://meet.google.com/webdev-01\",\n  \"day\": \"Friday\",\n  \"start_time\": \"13:00\",\n  \"end_time\": \"15:00\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -344,7 +344,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"subject\": \"\",\n  \"teacher\": \"Pak Doni\",\n  \"meeting_link\": \"https://meet.google.com/doni\",\n  \"day\": \"Rabu\",\n  \"start_time\": \"10:00\",\n  \"end_time\": \"09:00\"\n}",
+          "raw": "{\n  \"subject\": \"\",\n  \"teacher\": \"Mr. Doni\",\n  \"meeting_link\": \"https://meet.google.com/doni\",\n  \"day\": \"Wednesday\",\n  \"start_time\": \"10:00\",\n  \"end_time\": \"09:00\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -390,7 +390,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"subject\": \"Try Out\",\n  \"teacher\": \"Drs. Bambang Wijaya\",\n  \"meeting_link\": \"https://meet.google.com/tryout\",\n  \"day\": \"Senin\",\n  \"start_time\": \"08:00\",\n  \"end_time\": \"09:00\"\n}",
+          "raw": "{\n  \"subject\": \"Try Out\",\n  \"teacher\": \"Drs. Bambang Wijaya\",\n  \"meeting_link\": \"https://meet.google.com/tryout\",\n  \"day\": \"Monday\",\n  \"start_time\": \"08:00\",\n  \"end_time\": \"09:00\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -400,7 +400,7 @@
       }
     },
     {
-      "name": "Create schedule as viewer - 403",
+      "name": "Create schedule as student - 403",
       "event": [
         {
           "listen": "test",
@@ -436,7 +436,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"subject\": \"Tes\",\n  \"teacher\": \"X\",\n  \"meeting_link\": \"https://meet.google.com/tes\",\n  \"day\": \"Senin\",\n  \"start_time\": \"16:00\",\n  \"end_time\": \"17:00\"\n}",
+          "raw": "{\n  \"subject\": \"Test\",\n  \"teacher\": \"X\",\n  \"meeting_link\": \"https://meet.google.com/test\",\n  \"day\": \"Monday\",\n  \"start_time\": \"16:00\",\n  \"end_time\": \"17:00\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -478,7 +478,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"subject\": \"Tes\",\n  \"teacher\": \"X\",\n  \"meeting_link\": \"https://meet.google.com/tes\",\n  \"day\": \"Senin\",\n  \"start_time\": \"16:00\",\n  \"end_time\": \"17:00\"\n}",
+          "raw": "{\n  \"subject\": \"Test\",\n  \"teacher\": \"X\",\n  \"meeting_link\": \"https://meet.google.com/test\",\n  \"day\": \"Monday\",\n  \"start_time\": \"16:00\",\n  \"end_time\": \"17:00\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -514,7 +514,7 @@
           },
           {
             "key": "Idempotency-Key",
-            "value": "tambah-jadwal-001"
+            "value": "create-schedule-001"
           }
         ],
         "url": {
@@ -529,7 +529,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"subject\": \"Klub Robotik\",\n  \"teacher\": \"Pak Eko\",\n  \"meeting_link\": \"https://meet.google.com/robotik\",\n  \"day\": \"Sabtu\",\n  \"start_time\": \"09:00\",\n  \"end_time\": \"11:00\"\n}",
+          "raw": "{\n  \"subject\": \"Robotics Club\",\n  \"teacher\": \"Mr. Eko\",\n  \"meeting_link\": \"https://meet.google.com/robotics\",\n  \"day\": \"Saturday\",\n  \"start_time\": \"09:00\",\n  \"end_time\": \"11:00\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -576,7 +576,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"subject\": \"Matematika Wajib\",\n  \"teacher\": \"Drs. Bambang Wijaya\",\n  \"meeting_link\": \"https://meet.google.com/mtk-wajib-01\",\n  \"day\": \"Senin\",\n  \"start_time\": \"07:30\",\n  \"end_time\": \"09:15\"\n}",
+          "raw": "{\n  \"subject\": \"Mathematics\",\n  \"teacher\": \"Drs. Bambang Wijaya\",\n  \"meeting_link\": \"https://meet.google.com/math-01\",\n  \"day\": \"Monday\",\n  \"start_time\": \"07:30\",\n  \"end_time\": \"09:15\"\n}",
           "options": {
             "raw": {
               "language": "json"

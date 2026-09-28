@@ -9,7 +9,7 @@ function authenticate(req, res, next) {
   if (!match) {
     return res.status(401).json({
       success: false,
-      message: 'Belum login. Sertakan token pada header Authorization.',
+      message: 'Not signed in. Send a Bearer token in the Authorization header.',
     });
   }
 
@@ -20,7 +20,7 @@ function authenticate(req, res, next) {
   } catch {
     return res.status(401).json({
       success: false,
-      message: 'Sesi tidak valid atau sudah kedaluwarsa. Silakan login ulang.',
+      message: 'Invalid or expired session. Please sign in again.',
     });
   }
 }
@@ -30,7 +30,7 @@ function requireAdmin(req, res, next) {
   if (req.user?.role !== 'admin') {
     return res.status(403).json({
       success: false,
-      message: 'Akses ditolak. Hanya admin yang boleh mengubah jadwal.',
+      message: 'Access denied. Only admins can modify schedules.',
     });
   }
   return next();

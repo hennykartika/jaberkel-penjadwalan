@@ -3,16 +3,16 @@
 const { HttpError } = require('../lib/http');
 
 function notFound(req, res) {
-  res.status(404).json({ success: false, message: 'Endpoint tidak ditemukan.' });
+  res.status(404).json({ success: false, message: 'Endpoint not found.' });
 }
 
 // Body-parser failures are client errors; map them to a short message instead
 // of letting Express render its default HTML page with a stack trace.
 const BODY_PARSER_ERRORS = {
-  'entity.parse.failed': [400, 'Body request bukan JSON yang valid.'],
-  'entity.too.large': [413, 'Body request terlalu besar.'],
-  'encoding.unsupported': [415, 'Encoding body request tidak didukung.'],
-  'charset.unsupported': [415, 'Charset body request tidak didukung.'],
+  'entity.parse.failed': [400, 'Request body is not valid JSON.'],
+  'entity.too.large': [413, 'Request body is too large.'],
+  'encoding.unsupported': [415, 'Unsupported request body encoding.'],
+  'charset.unsupported': [415, 'Unsupported request body charset.'],
 };
 
 // Lock contention that survived the retries in withTransaction().
@@ -37,13 +37,13 @@ function errorHandler(err, req, res, next) {
   if (CONCURRENCY_ERRORS.has(err.code)) {
     return res.status(409).json({
       success: false,
-      message: 'Jadwal sedang diubah oleh request lain. Silakan coba lagi.',
+      message: 'The schedule is being changed by another request. Please try again.',
     });
   }
 
   // Full details stay in the server log; the client only gets a generic message.
   console.error(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} failed:`, err);
-  return res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server.' });
+  return res.status(500).json({ success: false, message: 'Internal server error.' });
 }
 
 module.exports = { notFound, errorHandler };

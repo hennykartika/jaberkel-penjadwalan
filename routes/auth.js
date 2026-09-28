@@ -24,17 +24,17 @@ const loginLimiter = rateLimit({
   skipSuccessfulRequests: true,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  message: { success: false, message: 'Terlalu banyak percobaan login. Coba lagi dalam 15 menit.' },
+  message: { success: false, message: 'Too many failed sign-in attempts. Try again in 15 minutes.' },
 });
 
-const invalidCredentials = () => new HttpError(401, 'Username atau password salah.');
+const invalidCredentials = () => new HttpError(401, 'Invalid username or password.');
 
 // POST /v1/auth/login  { username, password } -> { token, user }
 router.post('/login', loginLimiter, asyncHandler(async (req, res) => {
   const { username, password } = req.body ?? {};
 
   if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
-    throw new HttpError(400, 'Username dan password wajib diisi.');
+    throw new HttpError(400, 'Username and password are required.');
   }
   if (username.length > MAX_USERNAME_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
     throw invalidCredentials();
@@ -52,7 +52,7 @@ router.post('/login', loginLimiter, asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    message: 'Login berhasil.',
+    message: 'Signed in.',
     data: {
       token: signToken(user),
       user: { username: user.username, name: user.full_name, role: user.role },

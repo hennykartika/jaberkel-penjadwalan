@@ -18,7 +18,7 @@ let server;
 let baseUrl;
 
 const adminToken = signToken({ id: 1, username: 'admin', role: 'admin', full_name: 'Admin' });
-const viewerToken = signToken({ id: 2, username: 'siswa', role: 'viewer', full_name: 'Siswa' });
+const viewerToken = signToken({ id: 2, username: 'student', role: 'viewer', full_name: 'Student' });
 
 async function request(path, { method = 'GET', token, body, rawBody, headers = {} } = {}) {
   const init = { method, headers: { ...headers } };
@@ -138,7 +138,7 @@ test('invalid Idempotency-Key is rejected', async () => {
       subject: 'A',
       teacher: 'B',
       meeting_link: 'https://meet.example/a',
-      day: 'Senin',
+      day: 'Monday',
       start_time: '08:00',
       end_time: '09:00',
     },
@@ -157,7 +157,7 @@ test('database failure returns a generic 500 and the process keeps serving', asy
 
   const res = await request('/v1/schedules', { token: adminToken });
   assert.equal(res.status, 500);
-  assert.deepEqual(res.json, { success: false, message: 'Terjadi kesalahan pada server.' });
+  assert.deepEqual(res.json, { success: false, message: 'Internal server error.' });
   assert.doesNotMatch(res.text, /ECONNREFUSED|127\.0\.0\.1/);
   assert.equal(logged.mock.callCount(), 1, 'the real error is logged server-side');
 

@@ -21,13 +21,13 @@ const isAdmin = (user) => user.role === 'admin';
 
 function requireId(raw) {
   const id = parseId(raw);
-  if (id === null) throw new HttpError(400, 'ID jadwal tidak valid.');
+  if (id === null) throw new HttpError(400, 'Invalid schedule ID.');
   return id;
 }
 
 function requireValidSchedule(body) {
   const { errors, value } = validateSchedule(body);
-  if (errors.length > 0) throw new HttpError(400, 'Validasi gagal.', { errors });
+  if (errors.length > 0) throw new HttpError(400, 'Validation failed.', { errors });
   return value;
 }
 
@@ -35,7 +35,7 @@ function readIdempotencyKey(req) {
   const key = req.get('Idempotency-Key');
   if (key === undefined) return null;
   if (!isValidIdempotencyKey(key)) {
-    throw new HttpError(400, 'Idempotency-Key harus 1-100 karakter: huruf, angka, titik, titik dua, _ atau -.');
+    throw new HttpError(400, 'Idempotency-Key must be 1-100 characters of letters, digits, ".", ":", "_" or "-".');
   }
   return key;
 }
@@ -45,7 +45,7 @@ async function assertNoConflict(conn, slot, excludeId = null) {
   if (conflict) {
     throw new HttpError(
       409,
-      'Jadwal bentrok dengan sesi lain (guru atau link kelas yang sama pada waktu yang sama).',
+      'Schedule conflicts with another session (same teacher or meeting link at an overlapping time).',
       { conflicting_schedules },
     );
   }
@@ -75,7 +75,7 @@ async function replayStoredResponse(res, key) {
     [key],
   );
   if (rows.length === 0) {
-    throw new HttpError(409, 'Request dengan Idempotency-Key ini sedang diproses. Silakan coba lagi.');
+    throw new HttpError(409, 'A request with this Idempotency-Key is still being processed. Please retry.');
   }
   const body = JSON.parse(rows[0].response_body);
   return res.status(rows[0].status_code).json({ ...body, replayed: true });
@@ -87,7 +87,7 @@ router.use(authenticate);
 // GET /v1/schedules?q=  Viewers only see published schedules.
 router.get('/', asyncHandler(async (req, res) => {
   const term = parseSearchTerm(req.query.q);
-  if (term === null) throw new HttpError(400, 'Parameter pencarian (q) tidak valid.');
+  if (term === null) throw new HttpError(400, 'Invalid search parameter (q).');
 
   const conditions = [];
   const params = [];
@@ -101,7 +101,7 @@ router.get('/', asyncHandler(async (req, res) => {
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  // `day` is an ENUM, so it sorts in declaration order (Senin..Sabtu).
+  // `day` is an ENUM, so it sorts in declaration order (Monday..Saturday).
   const [rows] = await pool.execute(
     `SELECT ${COLUMNS} FROM schedules ${where} ORDER BY \`day\`, start_time`,
     params,
@@ -114,7 +114,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   const id = requireId(req.params.id);
   const visibility = isAdmin(req.user) ? '' : ' AND published = 1';
   const [rows] = await pool.execute(`SELECT ${COLUMNS} FROM schedules WHERE id = ?${visibility}`, [id]);
-  if (rows.length === 0) throw new HttpError(404, 'Jadwal tidak ditemukan.');
+  if (rows.length === 0) throw new HttpError(404, 'Schedule not found.');
   res.json({ success: true, data: rows[0] });
 }));
 
@@ -139,7 +139,7 @@ router.post('/', requireAdmin, asyncHandler(async (req, res) => {
 
     const body = {
       success: true,
-      message: 'Jadwal berhasil ditambahkan.',
+      message: 'Schedule created.',
       data: { id: result.insertId, ...schedule, published: 0 },
     };
 
@@ -166,7 +166,7 @@ router.put('/:id', requireAdmin, asyncHandler(async (req, res) => {
 
   const data = await withTransaction(async (conn) => {
     const [existing] = await conn.execute('SELECT published FROM schedules WHERE id = ? FOR UPDATE', [id]);
-    if (existing.length === 0) throw new HttpError(404, 'Jadwal tidak ditemukan.');
+    if (existing.length === 0) throw new HttpError(404, 'Schedule not found.');
 
     await assertNoConflict(conn, schedule, id);
 
@@ -178,23 +178,23 @@ router.put('/:id', requireAdmin, asyncHandler(async (req, res) => {
     return { id, ...schedule, published: existing[0].published };
   });
 
-  res.json({ success: true, message: 'Jadwal berhasil diperbarui.', data });
+  res.json({ success: true, message: 'Schedule updated.', data });
 }));
 
 // DELETE /v1/schedules/:id
 router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
   const id = requireId(req.params.id);
   const [result] = await pool.execute('DELETE FROM schedules WHERE id = ?', [id]);
-  if (result.affectedRows === 0) throw new HttpError(404, 'Jadwal tidak ditemukan.');
-  res.json({ success: true, message: 'Jadwal berhasil dihapus.' });
+  if (result.affectedRows === 0) throw new HttpError(404, 'Schedule not found.');
+  res.json({ success: true, message: 'Schedule deleted.' });
 }));
 
 // PUT /v1/schedules/:id/publish
 router.put('/:id/publish', requireAdmin, asyncHandler(async (req, res) => {
   const id = requireId(req.params.id);
   const [result] = await pool.execute('UPDATE schedules SET published = 1 WHERE id = ?', [id]);
-  if (result.affectedRows === 0) throw new HttpError(404, 'Jadwal tidak ditemukan.');
-  res.json({ success: true, message: 'Jadwal berhasil dipublikasikan.' });
+  if (result.affectedRows === 0) throw new HttpError(404, 'Schedule not found.');
+  res.json({ success: true, message: 'Schedule published.' });
 }));
 
 module.exports = router;

@@ -1,224 +1,227 @@
-# Jaberkel: Modul Penjadwalan (Schedule Service)
+# Jaberkel: Scheduling Module (Schedule Service)
 
 Final Project · System Development and Implementation
 
 Henny Kartika · 6026252017
 
-Aplikasi penjadwalan kelas untuk Jaberkel, bimbingan belajar online. Backend berupa
-REST API (Node.js, Express, MySQL) dan frontend web statis yang disajikan dari server
-yang sama. Modul yang dikerjakan hanya Penjadwalan; manajemen pengguna hanya dipakai
-sebatas login untuk kontrol akses.
+A class scheduling service for Jaberkel, an online tutoring center. The backend is a
+REST API (Node.js, Express, MySQL), and a static web frontend is served by the same
+server. Only the Scheduling module is in scope; user management exists only as far as
+signing in for access control.
 
-## 1. Menjalankan secara lokal
+## 1. Running locally
 
-Prasyarat: Node.js 20 atau lebih baru (disarankan versi LTS terbaru), dan MySQL/MariaDB
-(XAMPP atau Laragon).
+Requirements: Node.js 20 or newer (the latest LTS is recommended) and MySQL or MariaDB
+(XAMPP or Laragon work fine).
 
-1. Impor database. Buka phpMyAdmin, tab Import, pilih `schema.sql`, lalu Go.
-   Atau lewat terminal: `mysql -u root -p < schema.sql`.
-   Script ini membuat database `db_jaberkel` berisi tabel `users`, `schedules`,
-   `idempotency_keys` dan data contoh. Semua tabel di-drop lalu dibuat ulang, jadi
-   data lama di `db_jaberkel` akan hilang.
-2. Salin konfigurasi.
+1. Import the database. In phpMyAdmin open the Import tab, choose `schema.sql` and
+   click Go. From a terminal: `mysql -u root -p < schema.sql`.
+   The script creates the `db_jaberkel` database with the `users`, `schedules` and
+   `idempotency_keys` tables plus demo data. It drops and recreates every table, so
+   any existing data in `db_jaberkel` is lost.
+2. Create your configuration.
    ```bash
    cp .env.example .env
    ```
-   Isi `JWT_SECRET` (wajib, minimal 32 karakter). Server menolak start kalau nilainya
-   kosong atau terlalu pendek. Buat secret acak dengan:
+   Set `JWT_SECRET` (required, at least 32 characters). The server refuses to start
+   if it is empty or too short. Generate a random one with:
    ```bash
    node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
    ```
-   Untuk XAMPP bawaan, `DB_USER=root` dan `DB_PASSWORD` dikosongkan.
-3. Pasang dependency dan jalankan.
+   For a default XAMPP install use `DB_USER=root` and leave `DB_PASSWORD` empty.
+3. Install dependencies and start the server.
    ```bash
    npm install
    npm start
    ```
-4. Buka http://localhost:3000.
+4. Open http://localhost:3000.
 
-Server juga menolak start bila tidak bisa terhubung ke database, supaya salah
-konfigurasi langsung kelihatan saat startup.
+The server also refuses to start when it cannot reach the database, so configuration
+mistakes show up at startup instead of on the first request.
 
-### Akun demo
+### Demo accounts
 
-| Username | Password   | Peran  | Hak akses                                        |
-|----------|------------|--------|--------------------------------------------------|
-| `admin`  | `admin123` | admin  | Lihat semua jadwal, tambah/ubah/hapus/publikasi  |
-| `siswa`  | `siswa123` | viewer | Hanya melihat jadwal yang sudah dipublikasikan   |
+| Username  | Password     | Role   | Permissions                                   |
+|-----------|--------------|--------|-----------------------------------------------|
+| `admin`   | `admin123`   | admin  | View all schedules; create, edit, delete, publish |
+| `student` | `student123` | viewer | View published schedules only                 |
 
-Akun ini hanya untuk demo lokal. Ganti atau hapus sebelum aplikasi dipasang di
-server yang bisa diakses orang lain.
+These accounts are for local demos only. Change or remove them before deploying
+anywhere other people can reach.
 
-## 2. Alasan memakai login
+## 2. Why there is a login
 
-- Use case FR-SCH-01 (Tugas 12/13): hanya admin yang boleh menambah dan mengubah
-  jadwal, sedangkan siswa dan guru hanya melihat. Aturan ini tidak bisa ditegakkan
-  tanpa identitas pengguna.
-- Login mengisi peran Auth Service (utility service) pada arsitektur SOA, sehingga
-  arsitektur di laporan benar-benar terimplementasi.
-- Memberi skenario gagal untuk pengujian: viewer yang mencoba menambah jadwal
-  ditolak dengan `403 Forbidden`.
+- Use case FR-SCH-01 (Assignments 12 and 13): only admins may create and change
+  schedules, while students and teachers can only view them. That rule cannot be
+  enforced without knowing who the user is.
+- Signing in fills the role of the Auth Service (a utility service) in the SOA
+  design, so the architecture in the report is actually implemented.
+- It provides a failure case for testing: a viewer who tries to create a schedule
+  gets `403 Forbidden`.
 
-Login dibuat sederhana: satu endpoint `POST /v1/auth/login` yang mengembalikan
-token JWT (berlaku 8 jam, bisa diatur lewat `JWT_EXPIRES_IN`, mis. `30m`, `8h`, `7d`).
+Authentication is kept small: a single `POST /v1/auth/login` endpoint that returns a
+JWT, valid for 8 hours by default (configurable with `JWT_EXPIRES_IN`, e.g. `30m`,
+`8h`, `7d`).
 
-## 3. Arsitektur SOA
+## 3. SOA architecture
 
 ```
 Browser (public/)
    │  fetch + Bearer token
    ▼
 Process / orchestration      routes/schedules.js
-(handler POST dan PUT)       validasi → idempotency → CheckConflict → simpan
+(POST and PUT handlers)      validate → idempotency → CheckConflict → save
    │                                     │
-   │ verifikasi token                    │ dalam satu transaksi
+   │ verify token                        │ inside one transaction
    ▼                                     ▼
 Auth Service                 CheckConflict                 Schedule entity
-middleware/auth.js           services/checkConflict.js     tabel schedules (MySQL)
-lib/token.js                 cek bentrok guru/link/waktu
+middleware/auth.js           services/checkConflict.js     schedules table (MySQL)
+lib/token.js                 teacher / link / time clashes
 ```
 
-- Presentation layer: frontend `public/` (HTML/CSS/JS) yang memanggil REST API.
-- Process layer: handler `POST /v1/schedules` dan `PUT /v1/schedules/:id` sebagai
-  orchestrator. Validasi dilakukan di awal, lalu cek idempotency, CheckConflict dan
-  penyimpanan berjalan dalam satu transaksi database.
-- Service/utility layer: Auth Service (verifikasi JWT dan cek role) dan CheckConflict
-  (modul terpisah yang memetakan microservice pada desain).
-- Data layer: MySQL melalui connection pool (`db.js`).
+- Presentation layer: the `public/` frontend (HTML, CSS, JS) calling the REST API.
+- Process layer: `POST /v1/schedules` and `PUT /v1/schedules/:id` act as
+  orchestrators. Input is validated first; the idempotency check, CheckConflict and
+  the write then run inside a single database transaction.
+- Service / utility layer: the Auth Service (JWT verification and role checks) and
+  CheckConflict (a separate module that maps to the microservice in the design).
+- Data layer: MySQL through a connection pool (`db.js`).
 
-### Tabel service / routing (Soal 2b)
+### Service routing table (Question 2b)
 
-| Method | Path                        | Deskripsi                       | Input                                                          | Return                                         |
-|--------|-----------------------------|---------------------------------|----------------------------------------------------------------|------------------------------------------------|
-| POST   | `/v1/auth/login`            | Login, menghasilkan token       | body: `username`, `password`                                   | `{ success, data: { token, user } }`           |
-| GET    | `/v1/schedules`             | Daftar jadwal, pencarian `?q=`  | header `Authorization`; query `q`                              | `{ success, count, data: [...] }`              |
-| GET    | `/v1/schedules/:id`         | Satu jadwal                     | header `Authorization`; param `id`                             | `{ success, data }` / 404                      |
-| POST   | `/v1/schedules`             | Tambah jadwal (admin)           | header `Authorization`, opsional `Idempotency-Key`; body jadwal | `201 { success, data }` / 400 / 403 / 409     |
-| PUT    | `/v1/schedules/:id`         | Ubah jadwal (admin)             | header `Authorization`; param `id`; body jadwal                | `{ success, message, data }` / 400 / 404 / 409 |
-| DELETE | `/v1/schedules/:id`         | Hapus jadwal (admin)            | header `Authorization`; param `id`                             | `{ success, message }` / 404                   |
-| PUT    | `/v1/schedules/:id/publish` | Publikasikan jadwal (admin)     | header `Authorization`; param `id`                             | `{ success, message }` / 404                   |
+| Method | Path                        | Description                     | Input                                                             | Returns                                         |
+|--------|-----------------------------|---------------------------------|-------------------------------------------------------------------|-------------------------------------------------|
+| POST   | `/v1/auth/login`            | Sign in and get a token         | body: `username`, `password`                                      | `{ success, data: { token, user } }`            |
+| GET    | `/v1/schedules`             | List schedules, search with `?q=` | header `Authorization`; query `q`                               | `{ success, count, data: [...] }`               |
+| GET    | `/v1/schedules/:id`         | Get one schedule                | header `Authorization`; param `id`                                | `{ success, data }` / 404                       |
+| POST   | `/v1/schedules`             | Create a schedule (admin)       | header `Authorization`, optional `Idempotency-Key`; schedule body | `201 { success, data }` / 400 / 403 / 409       |
+| PUT    | `/v1/schedules/:id`         | Update a schedule (admin)       | header `Authorization`; param `id`; schedule body                 | `{ success, message, data }` / 400 / 404 / 409  |
+| DELETE | `/v1/schedules/:id`         | Delete a schedule (admin)       | header `Authorization`; param `id`                                | `{ success, message }` / 404                    |
+| PUT    | `/v1/schedules/:id/publish` | Publish a schedule (admin)      | header `Authorization`; param `id`                                | `{ success, message }` / 404                    |
 
-Field body jadwal: `subject` (maks. 100 karakter), `teacher` (maks. 100),
-`meeting_link` (URL http/https, maks. 255), `day` (Senin sampai Sabtu),
-`start_time` dan `end_time` (format `HH:MM` atau `HH:MM:SS`).
+Schedule body fields: `subject` (max. 100 characters), `teacher` (max. 100),
+`meeting_link` (http/https URL, max. 255), `day` (`Monday` to `Saturday`), and
+`start_time` / `end_time` (`HH:MM` or `HH:MM:SS`).
 
-Viewer hanya menerima jadwal yang sudah dipublikasikan. Jadwal draft tidak muncul di
-daftar dan `GET /v1/schedules/:id` untuk draft mengembalikan 404.
+Viewers only receive published schedules. Drafts are left out of the list, and
+`GET /v1/schedules/:id` returns 404 for a draft.
 
-Catatan: Jaberkel adalah bimbel online, jadi tidak ada ruangan fisik. Kolom
-`meeting_link` (tautan Zoom/Google Meet) menggantikan ruangan. Dua sesi dianggap
-bentrok bila berada di hari yang sama, memakai guru yang sama atau link kelas yang
-sama, dan waktunya tumpang tindih. Seorang guru tidak bisa mengajar dua kelas daring
-sekaligus, dan satu link tidak bisa dipakai dua sesi bersamaan.
+Note: Jaberkel teaches online, so there are no physical rooms. The `meeting_link`
+column (a Zoom or Google Meet URL) takes the place of a room. Two sessions conflict
+when they are on the same day, share the same teacher or the same meeting link, and
+their times overlap. A teacher cannot run two online classes at once, and one link
+cannot host two sessions at the same time.
 
-### Cara parameter diperoleh (Soal 2d / 3b)
+### How parameters are read (Questions 2d and 3b)
 
-- Path param (`:id`) dari `req.params.id`, divalidasi sebagai bilangan bulat positif.
-- Query param (`?q=`) dari `req.query.q`.
-- Body JSON dibaca middleware `express.json()` (batas 10 KB), lalu `req.body`.
-- Header dari `req.get('Idempotency-Key')` dan `req.get('Authorization')`.
+- Path parameter (`:id`) from `req.params.id`, validated as a positive integer.
+- Query parameter (`?q=`) from `req.query.q`.
+- JSON body parsed by `express.json()` (10 KB limit) into `req.body`.
+- Headers from `req.get('Idempotency-Key')` and `req.get('Authorization')`.
 
-### Komunikasi sukses dan gagal ke client (Soal 2d)
+### Reporting success and failure to the client (Question 2d)
 
-Semua balasan berbentuk `{ success, message, data | errors }` dengan HTTP status yang
-sesuai:
+Every response has the shape `{ success, message, data | errors }` with a matching
+HTTP status:
 
-| Skenario                    | Status | Isi                                          |
-|-----------------------------|--------|----------------------------------------------|
-| Berhasil tambah             | 201    | `success: true, data`                        |
-| Berhasil ubah / hapus       | 200    | `success: true, message`                     |
-| Validasi gagal              | 400    | `success: false, errors: [...]`              |
-| Belum login / token invalid | 401    | `success: false, message`                    |
-| Bukan admin                 | 403    | `success: false, message`                    |
-| Tidak ditemukan             | 404    | `success: false, message`                    |
-| Bentrok jadwal              | 409    | `success: false, conflicting_schedules: [...]` |
-| Terlalu banyak login gagal  | 429    | `success: false, message`                    |
-| Kesalahan server            | 500    | `success: false, message` (tanpa detail teknis) |
+| Scenario                      | Status | Body                                            |
+|-------------------------------|--------|-------------------------------------------------|
+| Created                       | 201    | `success: true, data`                           |
+| Updated / deleted             | 200    | `success: true, message`                        |
+| Validation failed             | 400    | `success: false, errors: [...]`                 |
+| Not signed in / invalid token | 401    | `success: false, message`                       |
+| Not an admin                  | 403    | `success: false, message`                       |
+| Not found                     | 404    | `success: false, message`                       |
+| Schedule conflict             | 409    | `success: false, conflicting_schedules: [...]`  |
+| Too many failed sign-ins      | 429    | `success: false, message`                       |
+| Server error                  | 500    | `success: false, message` (no technical details) |
 
-Detail error 500 hanya dicatat di log server dan tidak pernah dikirim ke client.
+Details of a 500 error are written to the server log only and never sent to the
+client.
 
-## 4. Skenario uji (Soal 3c)
+## 4. Test scenarios (Question 3c)
 
-| Test case          | Input                                                                                   | Expected result                              |
-|--------------------|-----------------------------------------------------------------------------------------|----------------------------------------------|
-| Sukses tambah      | Jadwal valid di slot kosong, mis. Jumat 13:00–15:00, link `https://meet.google.com/pemweb-01` | `201 Created`, data dengan ID baru     |
-| Gagal validasi     | `subject` kosong dan `start_time` lebih besar dari `end_time`                           | `400 Bad Request`, daftar `errors`           |
-| Gagal bentrok      | Senin 08:00–09:00 dengan guru Drs. Bambang Wijaya (menabrak Matematika Wajib)           | `409 Conflict`, `conflicting_schedules`      |
-| Gagal akses        | Viewer (siswa) menambah jadwal                                                          | `403 Forbidden`                              |
-| Anti-duplikat      | Dua POST dengan `Idempotency-Key` yang sama                                             | Data dibuat sekali, balasan kedua `replayed: true` |
+| Test case          | Input                                                                                          | Expected result                                  |
+|--------------------|------------------------------------------------------------------------------------------------|--------------------------------------------------|
+| Create succeeds    | A valid schedule in a free slot, e.g. Friday 13:00–15:00, link `https://meet.google.com/webdev-01` | `201 Created`, data with a new ID            |
+| Validation fails   | Empty `subject` and `start_time` later than `end_time`                                         | `400 Bad Request`, list of `errors`              |
+| Conflict           | Monday 08:00–09:00 with teacher Drs. Bambang Wijaya (overlaps Mathematics)                     | `409 Conflict`, `conflicting_schedules`          |
+| Access denied      | A viewer (student) creates a schedule                                                          | `403 Forbidden`                                  |
+| No duplicates      | Two POSTs with the same `Idempotency-Key`                                                      | Created once; the second response has `replayed: true` |
 
-Uji lewat Postman: impor `postman_collection.json`, jalankan request login lebih dulu
-(token tersimpan otomatis), lalu request lainnya. Setiap request punya assertion status
-code. Impor ulang `schema.sql` untuk mengembalikan data ke kondisi awal.
+To test with Postman, import `postman_collection.json`, run the two login requests
+first (they store the tokens), then the rest. Every request asserts its expected
+status code. Re-import `schema.sql` to reset the data.
 
-## 5. Keamanan
+## 5. Security
 
-- `JWT_SECRET` wajib dari environment dan minimal 32 karakter, tanpa nilai default.
-  Algoritma JWT dikunci ke HS256.
-- `.env` tidak ikut di-commit; `.env.example` hanya berisi placeholder.
-- Password disimpan sebagai hash bcrypt. Login dengan username yang tidak ada tetap
-  menjalankan bcrypt, sehingga waktu respons tidak membocorkan username mana yang ada.
-- Login dibatasi 10 percobaan gagal per 15 menit per IP.
-- Semua query yang menerima input memakai prepared statement (`execute`). Input
-  divalidasi tipe, format dan panjangnya sebelum menyentuh database.
-- Frontend meng-escape semua data sebelum dirender dan hanya membuat link untuk URL
-  `http`/`https`. Header keamanan (CSP, `X-Content-Type-Options`, dsb.) dipasang
-  lewat `helmet`.
-- CORS nonaktif secara default karena frontend dan API berada di origin yang sama.
-  Isi `CORS_ORIGIN` bila ada client dari domain lain.
-- Cek bentrok dan insert berjalan dalam satu transaksi dengan `SELECT ... FOR UPDATE`,
-  sehingga dua request bersamaan untuk slot yang sama tidak bisa sama-sama lolos.
+- `JWT_SECRET` must come from the environment and be at least 32 characters; there is
+  no default value. The JWT algorithm is pinned to HS256.
+- `.env` is never committed; `.env.example` only contains placeholders.
+- Passwords are stored as bcrypt hashes. A sign-in with an unknown username still
+  runs bcrypt, so response times do not reveal which usernames exist.
+- Sign-in is limited to 10 failed attempts per 15 minutes per IP.
+- Every query that takes input uses a prepared statement (`execute`). Input type,
+  format and length are validated before anything reaches the database.
+- The frontend escapes all data before rendering it and only creates links for
+  `http`/`https` URLs. Security headers (CSP, `X-Content-Type-Options`, etc.) are set
+  with `helmet`.
+- CORS is off by default because the frontend and the API share one origin. Set
+  `CORS_ORIGIN` if a client on another domain needs access.
+- The conflict check and the insert run in one transaction with
+  `SELECT ... FOR UPDATE`, so two simultaneous requests for the same slot cannot both
+  succeed.
 
-Di luar lingkungan lokal, jangan memakai akun `root`. Buat user khusus dengan hak
-minimum:
+Outside local development, do not use the `root` account. Create a dedicated user
+with minimal privileges:
 
 ```sql
-CREATE USER 'jaberkel_app'@'localhost' IDENTIFIED BY 'ganti-dengan-password-kuat';
+CREATE USER 'jaberkel_app'@'localhost' IDENTIFIED BY 'replace-with-a-strong-password';
 GRANT SELECT, INSERT, UPDATE, DELETE ON db_jaberkel.* TO 'jaberkel_app'@'localhost';
 ```
 
-Port MySQL (3306) juga sebaiknya tidak dibuka ke jaringan publik.
+Do not expose the MySQL port (3306) to a public network either.
 
-## 6. Pengujian otomatis
+## 6. Automated tests
 
 ```bash
-npm test        # unit test, test HTTP, dan test startup (tanpa database)
+npm test        # unit, HTTP and startup tests (no database needed)
 npm run lint
 ```
 
-Integration test berjalan terhadap MySQL/MariaDB sungguhan, termasuk uji 20 request
-bersamaan untuk slot yang sama. Test ini membuat lalu menghapus database yang
-namanya diberikan lewat `TEST_DB_NAME`, jadi jangan pakai `db_jaberkel`:
+The integration tests run against a real MySQL or MariaDB server, including 20
+simultaneous requests for the same slot. They create and then drop the database named
+in `TEST_DB_NAME`, so never point it at `db_jaberkel`:
 
 ```bash
 TEST_DB_NAME=db_jaberkel_test npm test            # bash
 $env:TEST_DB_NAME="db_jaberkel_test"; npm test    # PowerShell
 ```
 
-## 7. Struktur proyek
+## 7. Project structure
 
 ```
 jaberkel-penjadwalan/
-├── server.js                  # startup: cek config dan DB, listen, graceful shutdown
-├── app.js                     # konfigurasi Express (middleware dan routing)
-├── config.js                  # membaca dan memvalidasi environment variable
-├── db.js                      # connection pool MySQL dan helper transaksi
-├── schema.sql                 # skema database dan data contoh
-├── .env.example               # contoh konfigurasi
-├── postman_collection.json    # koleksi uji API
+├── server.js                  # startup: check config and DB, listen, graceful shutdown
+├── app.js                     # Express setup (middleware and routing)
+├── config.js                  # reads and validates environment variables
+├── db.js                      # MySQL connection pool and transaction helper
+├── schema.sql                 # database schema and demo data
+├── .env.example               # sample configuration
+├── postman_collection.json    # API test collection
 ├── lib/
-│   ├── http.js                # HttpError dan asyncHandler
-│   └── token.js               # sign dan verify JWT
+│   ├── http.js                # HttpError and asyncHandler
+│   └── token.js               # JWT sign and verify
 ├── middleware/
-│   ├── auth.js                # Auth Service: verifikasi token dan cek role
-│   └── errors.js              # 404 dan error handler terpusat
+│   ├── auth.js                # Auth Service: token verification and role checks
+│   └── errors.js              # 404 and central error handler
 ├── routes/
 │   ├── auth.js                # POST /v1/auth/login
-│   └── schedules.js           # CRUD dan publish (orchestration)
+│   └── schedules.js           # CRUD and publish (orchestration)
 ├── services/
-│   └── checkConflict.js       # CheckConflict: deteksi bentrok
+│   └── checkConflict.js       # CheckConflict: conflict detection
 ├── validators/
-│   └── schedule.js            # validasi dan normalisasi input
+│   └── schedule.js            # input validation and normalization
 ├── test/                      # node:test
 └── public/                    # frontend
     ├── index.html
@@ -226,11 +229,11 @@ jaberkel-penjadwalan/
     └── js/app.js
 ```
 
-## 8. Ketahanan antar-service (lanjutan Tugas 13)
+## 8. Service resilience (follow-up to Assignment 13)
 
-Handler POST sudah memuat idempotency key (anti data ganda, aman untuk request yang
-dikirim bersamaan), validasi, pemanggilan CheckConflict, dan transaksi
-commit/rollback (anti data setengah jadi). Deadlock InnoDB yang muncul saat dua
-request berebut slot yang sama di-retry otomatis. Timeout dan circuit breaker perlu
-ditambahkan bila CheckConflict dipisah ke proses atau port sendiri seperti pada
-Tugas 13.
+The POST handler already covers idempotency keys (no duplicate records, safe for
+concurrent retries), validation, the CheckConflict call, and commit/rollback
+transactions (no half-written data). InnoDB deadlocks that occur when two requests
+compete for the same slot are retried automatically. Timeouts and a circuit breaker
+would be the next step if CheckConflict were moved to its own process or port, as
+described in Assignment 13.
