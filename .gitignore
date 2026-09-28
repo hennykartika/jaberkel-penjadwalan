@@ -1,3 +1,12 @@
 node_modules/
+
+# Local configuration and secrets
 .env
+.env.*
+!.env.example
+
+# Logs and OS files
 *.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

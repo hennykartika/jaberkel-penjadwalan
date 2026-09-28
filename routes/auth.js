@@ -1,49 +1,63 @@
-// routes/auth.js — Auth Service: endpoint login menghasilkan token JWT.
+'use strict';
+
+const crypto = require('node:crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const pool = require('../db');
+const { rateLimit } = require('express-rate-limit');
+const { pool } = require('../db');
+const { signToken } = require('../lib/token');
+const { HttpError, asyncHandler } = require('../lib/http');
 
 const router = express.Router();
-const SECRET = process.env.JWT_SECRET || 'dev-secret';
+
+const MAX_USERNAME_LENGTH = 50; // users.username is VARCHAR(50)
+const MAX_PASSWORD_LENGTH = 128;
+
+// Compared against when the username does not exist, so a missing user takes
+// as long to reject as a wrong password and usernames cannot be probed by timing.
+const DUMMY_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
+
+// Failed attempts only; a successful login does not use up the quota.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { success: false, message: 'Terlalu banyak percobaan login. Coba lagi dalam 15 menit.' },
+});
+
+const invalidCredentials = () => new HttpError(401, 'Username atau password salah.');
 
 // POST /v1/auth/login  { username, password } -> { token, user }
-router.post('/login', async (req, res) => {
-  const { username, password } = req.body || {};
+router.post('/login', loginLimiter, asyncHandler(async (req, res) => {
+  const { username, password } = req.body ?? {};
 
-  if (!username || !password) {
-    return res.status(400).json({ success: false, message: 'Username dan password wajib diisi.' });
+  if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
+    throw new HttpError(400, 'Username dan password wajib diisi.');
+  }
+  if (username.length > MAX_USERNAME_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
+    throw invalidCredentials();
   }
 
-  try {
-    const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
-    if (rows.length === 0) {
-      return res.status(401).json({ success: false, message: 'Username atau password salah.' });
-    }
-
-    const user = rows[0];
-    const cocok = await bcrypt.compare(password, user.password_hash);
-    if (!cocok) {
-      return res.status(401).json({ success: false, message: 'Username atau password salah.' });
-    }
-
-    const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, name: user.full_name },
-      SECRET,
-      { expiresIn: '8h' }
-    );
-
-    return res.json({
-      success: true,
-      message: 'Login berhasil.',
-      data: {
-        token,
-        user: { username: user.username, name: user.full_name, role: user.role },
-      },
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: 'Kesalahan server saat login.', error: err.message });
+  const [rows] = await pool.execute(
+    'SELECT id, username, password_hash, full_name, role FROM users WHERE username = ?',
+    [username.trim()],
+  );
+  const user = rows[0];
+  const passwordMatches = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
+  if (!user || !passwordMatches) {
+    throw invalidCredentials();
   }
-});
+
+  res.json({
+    success: true,
+    message: 'Login berhasil.',
+    data: {
+      token: signToken(user),
+      user: { username: user.username, name: user.full_name, role: user.role },
+    },
+  });
+}));
 
 module.exports = router;

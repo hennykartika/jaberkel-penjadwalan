@@ -1,32 +1,43 @@
-// server.js — Entry point Schedule Service (Modul Penjadwalan).
-// Menyajikan REST API sekaligus frontend statis dari folder /public.
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-require('dotenv').config();
+'use strict';
 
-const app = express();
+let config;
+try {
+  config = require('./config');
+} catch (err) {
+  console.error(err.message);
+  console.error('Copy .env.example to .env and fill in the values. See README.md.');
+  process.exit(1);
+}
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+const { createApp } = require('./app');
+const { pool } = require('./db');
 
-// Rute API
-app.use('/v1/auth', require('./routes/auth'));
-app.use('/v1/schedules', require('./routes/schedules'));
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
-// Health check
-app.get('/health', (req, res) =>
-  res.json({ success: true, service: 'Jaberkel Schedule Service', status: 'OK' })
-);
+async function start() {
+  try {
+    await pool.query('SELECT 1');
+  } catch (err) {
+    console.error(`Cannot connect to MySQL database "${config.db.database}" at ${config.db.host}:${config.db.port}: ${err.message}`);
+    console.error('Make sure MySQL is running and schema.sql has been imported.');
+    await pool.end().catch(() => {});
+    process.exit(1);
+  }
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log('========================================================');
-  console.log('  Jaberkel — Schedule Service (Modul Penjadwalan)');
-  console.log('  Henny Kartika · 6026252017');
-  console.log('========================================================');
-  console.log(`  Frontend : http://localhost:${PORT}`);
-  console.log(`  API      : http://localhost:${PORT}/v1/schedules`);
-  console.log('========================================================');
-});
+  const server = createApp().listen(config.port, () => {
+    console.log(`Jaberkel schedule service listening on http://localhost:${config.port} (${config.env})`);
+  });
+
+  const shutdown = (signal) => {
+    console.log(`${signal} received, shutting down`);
+    setTimeout(() => process.exit(1), SHUTDOWN_TIMEOUT_MS).unref();
+    server.close(() => {
+      pool.end().finally(() => process.exit(0));
+    });
+  };
+
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
+}
+
+start();
