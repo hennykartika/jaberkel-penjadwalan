@@ -1,137 +1,691 @@
 {
   "info": {
-    "name": "Jaberkel - Schedule Service (Penjadwalan)",
-    "_postman_id": "jaberkel-penjadwalan-fp",
-    "description": "Koleksi pengujian Schedule Service. Henny Kartika 6026252017. Jalankan 'Login (admin)' lebih dulu agar variabel {{token}} terisi otomatis.",
+    "name": "Jaberkel - Schedule Service",
+    "description": "API tests for the Jaberkel schedule service. Run the two login requests first; they store {{token}} and {{viewerToken}}. Re-import schema.sql to reset the data before a full run.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000" },
-    { "key": "token", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "viewerToken",
+      "value": ""
+    },
+    {
+      "key": "createdId",
+      "value": ""
+    }
   ],
   "item": [
     {
-      "name": "Login (admin) -> simpan token",
+      "name": "Login as admin (stores token)",
       "event": [
         {
           "listen": "test",
           "script": {
+            "type": "text/javascript",
             "exec": [
-              "var json = pm.response.json();",
-              "if (json.success) { pm.collectionVariables.set('token', json.data.token); }",
-              "pm.test('Login berhasil', function () { pm.expect(json.success).to.be.true; });"
-            ],
-            "type": "text/javascript"
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.collectionVariables.set('token', pm.response.json().data.token);"
+            ]
           }
         }
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": { "mode": "raw", "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}" },
-        "url": { "raw": "{{baseUrl}}/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["v1", "auth", "login"] }
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "auth",
+            "login"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       }
     },
     {
-      "name": "GET semua jadwal",
+      "name": "Login as viewer (stores viewerToken)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.collectionVariables.set('viewerToken', pm.response.json().data.token);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "auth",
+            "login"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"siswa\",\n  \"password\": \"siswa123\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Login with wrong password - 401",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 401', function () { pm.response.to.have.status(401); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "auth",
+            "login"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"salah\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "List schedules",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-        "url": { "raw": "{{baseUrl}}/v1/schedules", "host": ["{{baseUrl}}"], "path": ["v1", "schedules"] }
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules"
+          ]
+        }
       }
     },
     {
-      "name": "GET cari jadwal (?q=)",
+      "name": "Search schedules (?q=)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-        "url": { "raw": "{{baseUrl}}/v1/schedules?q=Matematika", "host": ["{{baseUrl}}"], "path": ["v1", "schedules"], "query": [{ "key": "q", "value": "Matematika" }] }
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules?q=Matematika",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "Matematika"
+            }
+          ]
+        }
       }
     },
     {
-      "name": "POST tambah jadwal (SUKSES)",
+      "name": "Viewer sees published schedules only",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('no drafts', function () { pm.expect(pm.response.json().data.every(function (s) { return s.published === 1; })).to.be.true; });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{viewerToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create schedule - 201",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "pm.collectionVariables.set('createdId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
-        "body": { "mode": "raw", "raw": "{\n  \"subject\": \"Pemrograman Web\",\n  \"teacher\": \"Bu Henny\",\n  \"meeting_link\": \"https://meet.google.com/pemweb-01\",\n  \"day\": \"Jumat\",\n  \"start_time\": \"13:00:00\",\n  \"end_time\": \"15:00:00\"\n}" },
-        "url": { "raw": "{{baseUrl}}/v1/schedules", "host": ["{{baseUrl}}"], "path": ["v1", "schedules"] }
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subject\": \"Pemrograman Web\",\n  \"teacher\": \"Bu Henny\",\n  \"meeting_link\": \"https://meet.google.com/pemweb-01\",\n  \"day\": \"Jumat\",\n  \"start_time\": \"13:00\",\n  \"end_time\": \"15:00\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       }
     },
     {
-      "name": "POST validasi GAGAL (400)",
+      "name": "Create schedule, invalid input - 400",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 400', function () { pm.response.to.have.status(400); });"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
-        "body": { "mode": "raw", "raw": "{\n  \"subject\": \"\",\n  \"teacher\": \"Pak Doni\",\n  \"meeting_link\": \"https://meet.google.com/doni\",\n  \"day\": \"Rabu\",\n  \"start_time\": \"10:00:00\",\n  \"end_time\": \"09:00:00\"\n}" },
-        "url": { "raw": "{{baseUrl}}/v1/schedules", "host": ["{{baseUrl}}"], "path": ["v1", "schedules"] }
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subject\": \"\",\n  \"teacher\": \"Pak Doni\",\n  \"meeting_link\": \"https://meet.google.com/doni\",\n  \"day\": \"Rabu\",\n  \"start_time\": \"10:00\",\n  \"end_time\": \"09:00\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       }
     },
     {
-      "name": "POST jadwal BENTROK (409)",
+      "name": "Create schedule, teacher conflict - 409",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 409', function () { pm.response.to.have.status(409); });"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
-        "body": { "mode": "raw", "raw": "{\n  \"subject\": \"Try Out\",\n  \"teacher\": \"Drs. Bambang Wijaya\",\n  \"meeting_link\": \"https://meet.google.com/tryout\",\n  \"day\": \"Senin\",\n  \"start_time\": \"08:00:00\",\n  \"end_time\": \"09:00:00\"\n}" },
-        "url": { "raw": "{{baseUrl}}/v1/schedules", "host": ["{{baseUrl}}"], "path": ["v1", "schedules"] }
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subject\": \"Try Out\",\n  \"teacher\": \"Drs. Bambang Wijaya\",\n  \"meeting_link\": \"https://meet.google.com/tryout\",\n  \"day\": \"Senin\",\n  \"start_time\": \"08:00\",\n  \"end_time\": \"09:00\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       }
     },
     {
-      "name": "POST idempotency (anti ganda)",
+      "name": "Create schedule as viewer - 403",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 403', function () { pm.response.to.have.status(403); });"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" },
-          { "key": "Idempotency-Key", "value": "tambah-jadwal-001" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{viewerToken}}"
+          }
         ],
-        "body": { "mode": "raw", "raw": "{\n  \"subject\": \"Klub Robotik\",\n  \"teacher\": \"Pak Eko\",\n  \"meeting_link\": \"https://meet.google.com/robotik\",\n  \"day\": \"Sabtu\",\n  \"start_time\": \"09:00:00\",\n  \"end_time\": \"11:00:00\"\n}" },
-        "url": { "raw": "{{baseUrl}}/v1/schedules", "host": ["{{baseUrl}}"], "path": ["v1", "schedules"] }
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subject\": \"Tes\",\n  \"teacher\": \"X\",\n  \"meeting_link\": \"https://meet.google.com/tes\",\n  \"day\": \"Senin\",\n  \"start_time\": \"16:00\",\n  \"end_time\": \"17:00\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       }
     },
     {
-      "name": "PUT ubah jadwal",
+      "name": "Create schedule without token - 401",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 401', function () { pm.response.to.have.status(401); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subject\": \"Tes\",\n  \"teacher\": \"X\",\n  \"meeting_link\": \"https://meet.google.com/tes\",\n  \"day\": \"Senin\",\n  \"start_time\": \"16:00\",\n  \"end_time\": \"17:00\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Create with Idempotency-Key (send twice)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "// The second send returns the stored response with replayed: true."
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "tambah-jadwal-001"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subject\": \"Klub Robotik\",\n  \"teacher\": \"Pak Eko\",\n  \"meeting_link\": \"https://meet.google.com/robotik\",\n  \"day\": \"Sabtu\",\n  \"start_time\": \"09:00\",\n  \"end_time\": \"11:00\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Update schedule",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{token}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
-        "body": { "mode": "raw", "raw": "{\n  \"subject\": \"Matematika Wajib\",\n  \"teacher\": \"Drs. Bambang Wijaya\",\n  \"meeting_link\": \"https://meet.google.com/mtk-wajib-01\",\n  \"day\": \"Senin\",\n  \"start_time\": \"07:30:00\",\n  \"end_time\": \"09:15:00\"\n}" },
-        "url": { "raw": "{{baseUrl}}/v1/schedules/1", "host": ["{{baseUrl}}"], "path": ["v1", "schedules", "1"] }
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules",
+            "1"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subject\": \"Matematika Wajib\",\n  \"teacher\": \"Drs. Bambang Wijaya\",\n  \"meeting_link\": \"https://meet.google.com/mtk-wajib-01\",\n  \"day\": \"Senin\",\n  \"start_time\": \"07:30\",\n  \"end_time\": \"09:15\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       }
     },
     {
-      "name": "PUT publikasikan jadwal",
+      "name": "Publish schedule",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "PUT",
-        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-        "url": { "raw": "{{baseUrl}}/v1/schedules/4/publish", "host": ["{{baseUrl}}"], "path": ["v1", "schedules", "4", "publish"] }
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules/4/publish",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules",
+            "4",
+            "publish"
+          ]
+        }
       }
     },
     {
-      "name": "DELETE hapus jadwal",
+      "name": "Delete the schedule created above",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "DELETE",
-        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-        "url": { "raw": "{{baseUrl}}/v1/schedules/10", "host": ["{{baseUrl}}"], "path": ["v1", "schedules", "10"] }
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules/{{createdId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules",
+            "{{createdId}}"
+          ]
+        }
       }
     },
     {
-      "name": "POST tanpa token (403/401) - uji akses",
+      "name": "Get missing schedule - 404",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 404', function () { pm.response.to.have.status(404); });"
+            ]
+          }
+        }
+      ],
       "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": { "mode": "raw", "raw": "{\n  \"subject\": \"Tes\",\n  \"teacher\": \"X\",\n  \"meeting_link\": \"https://meet.google.com/tes\",\n  \"day\": \"Senin\",\n  \"start_time\": \"16:00:00\",\n  \"end_time\": \"17:00:00\"\n}" },
-        "url": { "raw": "{{baseUrl}}/v1/schedules", "host": ["{{baseUrl}}"], "path": ["v1", "schedules"] }
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/v1/schedules/99999",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "v1",
+            "schedules",
+            "99999"
+          ]
+        }
       }
     }
   ]
