@@ -1,167 +1,200 @@
-// routes/schedules.js — Schedule Service (Entity Service).
-// Endpoint mengikuti Service Routing Table Tugas 12/13.
-// Jaberkel = bimbel ONLINE: field "meeting_link" menggantikan "ruangan".
+'use strict';
+
 const express = require('express');
-const pool = require('../db');
+const { pool, withTransaction } = require('../db');
 const { checkConflict } = require('../services/checkConflict');
 const { authenticate, requireAdmin } = require('../middleware/auth');
+const { HttpError, asyncHandler } = require('../lib/http');
+const {
+  validateSchedule,
+  parseId,
+  parseSearchTerm,
+  escapeLike,
+  isValidIdempotencyKey,
+} = require('../validators/schedule');
 
 const router = express.Router();
-const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
-// --- Validasi input (dipakai POST & PUT) ---------------------------------
-function validateSchedule(b = {}) {
-  const errors = [];
-  if (!b.subject || !String(b.subject).trim()) errors.push('Mata pelajaran (subject) wajib diisi.');
-  if (!b.teacher || !String(b.teacher).trim()) errors.push('Guru (teacher) wajib diisi.');
-  if (!b.meeting_link || !String(b.meeting_link).trim()) {
-    errors.push('Link kelas online (meeting_link) wajib diisi.');
-  } else if (!/^https?:\/\/.+/i.test(String(b.meeting_link).trim())) {
-    errors.push('Link kelas harus berupa URL yang valid (diawali http:// atau https://).');
-  }
-  if (!b.day || !DAYS.includes(b.day)) errors.push('Hari (day) harus salah satu dari: ' + DAYS.join(', ') + '.');
-  if (!b.start_time) errors.push('Jam mulai (start_time) wajib diisi.');
-  if (!b.end_time) errors.push('Jam selesai (end_time) wajib diisi.');
-  if (b.start_time && b.end_time && b.start_time >= b.end_time) {
-    errors.push('Jam mulai harus lebih awal dari jam selesai.');
-  }
-  return errors;
+const COLUMNS = 'id, subject, teacher, meeting_link, `day`, start_time, end_time, published';
+
+const isAdmin = (user) => user.role === 'admin';
+
+function requireId(raw) {
+  const id = parseId(raw);
+  if (id === null) throw new HttpError(400, 'ID jadwal tidak valid.');
+  return id;
 }
 
-// --- GET semua jadwal (dukung pencarian ?q=) -----------------------------
-router.get('/', authenticate, async (req, res) => {
-  try {
-    const q = (req.query.q || '').trim();
-    let sql = 'SELECT * FROM schedules';
-    const params = [];
-    if (q) {
-      sql += ' WHERE subject LIKE ? OR teacher LIKE ?';
-      params.push(`%${q}%`, `%${q}%`);
-    }
-    sql += ' ORDER BY FIELD(`day`,"Senin","Selasa","Rabu","Kamis","Jumat","Sabtu","Minggu"), start_time';
-    const [rows] = await pool.query(sql, params);
-    res.json({ success: true, count: rows.length, data: rows });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Gagal mengambil data jadwal.', error: err.message });
+function requireValidSchedule(body) {
+  const { errors, value } = validateSchedule(body);
+  if (errors.length > 0) throw new HttpError(400, 'Validasi gagal.', { errors });
+  return value;
+}
+
+function readIdempotencyKey(req) {
+  const key = req.get('Idempotency-Key');
+  if (key === undefined) return null;
+  if (!isValidIdempotencyKey(key)) {
+    throw new HttpError(400, 'Idempotency-Key harus 1-100 karakter: huruf, angka, titik, titik dua, _ atau -.');
   }
-});
+  return key;
+}
 
-// --- GET satu jadwal -----------------------------------------------------
-router.get('/:id', authenticate, async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM schedules WHERE id = ?', [req.params.id]);
-    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Jadwal tidak ditemukan.' });
-    res.json({ success: true, data: rows[0] });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Gagal mengambil jadwal.', error: err.message });
-  }
-});
-
-// --- POST tambah jadwal (admin) ------------------------------------------
-// Orkestrasi: validasi -> cek idempotency -> CheckConflict -> simpan dalam transaction.
-router.post('/', authenticate, requireAdmin, async (req, res) => {
-  const errors = validateSchedule(req.body);
-  if (errors.length) return res.status(400).json({ success: false, message: 'Validasi gagal.', errors });
-
-  const { subject, teacher, meeting_link, day, start_time, end_time } = req.body;
-
-  // (1) Anti duplicate request — replay hasil bila key sudah pernah diproses.
-  const idemKey = req.header('Idempotency-Key');
-  if (idemKey) {
-    const [seen] = await pool.query(
-      'SELECT status_code, response_body FROM idempotency_keys WHERE id_key = ?', [idemKey]);
-    if (seen.length) {
-      const body = JSON.parse(seen[0].response_body);
-      return res.status(seen[0].status_code).json({ ...body, replayed: true });
-    }
-  }
-
-  // (2) Panggil underlying service: CheckConflict.
-  const { conflict, conflicting_schedules } = await checkConflict({ teacher, meeting_link, day, start_time, end_time });
+async function assertNoConflict(conn, slot, excludeId = null) {
+  const { conflict, conflicting_schedules } = await checkConflict(conn, { ...slot, excludeId });
   if (conflict) {
-    return res.status(409).json({
-      success: false,
-      message: 'Jadwal bentrok dengan sesi lain (guru atau link kelas yang sama pada waktu yang sama).',
-      conflicting_schedules,
-    });
+    throw new HttpError(
+      409,
+      'Jadwal bentrok dengan sesi lain (guru atau link kelas yang sama pada waktu yang sama).',
+      { conflicting_schedules },
+    );
+  }
+}
+
+/**
+ * Claims the key by inserting a placeholder row. A concurrent request with the
+ * same key blocks on the primary key until this transaction ends, then gets
+ * ER_DUP_ENTRY. Returns false when the key was already used.
+ */
+async function reserveIdempotencyKey(conn, key) {
+  try {
+    await conn.execute(
+      'INSERT INTO idempotency_keys (id_key, status_code, response_body) VALUES (?, 0, ?)',
+      [key, '{}'],
+    );
+    return true;
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return false;
+    throw err;
+  }
+}
+
+async function replayStoredResponse(res, key) {
+  const [rows] = await pool.execute(
+    'SELECT status_code, response_body FROM idempotency_keys WHERE id_key = ?',
+    [key],
+  );
+  if (rows.length === 0) {
+    throw new HttpError(409, 'Request dengan Idempotency-Key ini sedang diproses. Silakan coba lagi.');
+  }
+  const body = JSON.parse(rows[0].response_body);
+  return res.status(rows[0].status_code).json({ ...body, replayed: true });
+}
+
+// Every schedule endpoint requires a logged-in user.
+router.use(authenticate);
+
+// GET /v1/schedules?q=  Viewers only see published schedules.
+router.get('/', asyncHandler(async (req, res) => {
+  const term = parseSearchTerm(req.query.q);
+  if (term === null) throw new HttpError(400, 'Parameter pencarian (q) tidak valid.');
+
+  const conditions = [];
+  const params = [];
+  if (!isAdmin(req.user)) {
+    conditions.push('published = 1');
+  }
+  if (term) {
+    conditions.push("(subject LIKE ? ESCAPE '!' OR teacher LIKE ? ESCAPE '!')");
+    const pattern = `%${escapeLike(term)}%`;
+    params.push(pattern, pattern);
   }
 
-  // (3) Anti inconsistency — simpan dalam transaction (commit/rollback).
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const [result] = await conn.query(
-      'INSERT INTO schedules (subject, teacher, meeting_link, `day`, start_time, end_time) VALUES (?,?,?,?,?,?)',
-      [subject, teacher, meeting_link, day, start_time, end_time]
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  // `day` is an ENUM, so it sorts in declaration order (Senin..Sabtu).
+  const [rows] = await pool.execute(
+    `SELECT ${COLUMNS} FROM schedules ${where} ORDER BY \`day\`, start_time`,
+    params,
+  );
+  res.json({ success: true, count: rows.length, data: rows });
+}));
+
+// GET /v1/schedules/:id
+router.get('/:id', asyncHandler(async (req, res) => {
+  const id = requireId(req.params.id);
+  const visibility = isAdmin(req.user) ? '' : ' AND published = 1';
+  const [rows] = await pool.execute(`SELECT ${COLUMNS} FROM schedules WHERE id = ?${visibility}`, [id]);
+  if (rows.length === 0) throw new HttpError(404, 'Jadwal tidak ditemukan.');
+  res.json({ success: true, data: rows[0] });
+}));
+
+// POST /v1/schedules
+// Orchestration: validate -> idempotency -> CheckConflict -> insert, all but
+// validation inside one transaction so the conflict check and the insert are atomic.
+router.post('/', requireAdmin, asyncHandler(async (req, res) => {
+  const schedule = requireValidSchedule(req.body);
+  const idempotencyKey = readIdempotencyKey(req);
+
+  const outcome = await withTransaction(async (conn) => {
+    if (idempotencyKey && !(await reserveIdempotencyKey(conn, idempotencyKey))) {
+      return { replay: true };
+    }
+
+    await assertNoConflict(conn, schedule);
+
+    const [result] = await conn.execute(
+      'INSERT INTO schedules (subject, teacher, meeting_link, `day`, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?)',
+      [schedule.subject, schedule.teacher, schedule.meeting_link, schedule.day, schedule.start_time, schedule.end_time],
     );
+
     const body = {
       success: true,
       message: 'Jadwal berhasil ditambahkan.',
-      data: { id: result.insertId, subject, teacher, meeting_link, day, start_time, end_time, published: 0 },
+      data: { id: result.insertId, ...schedule, published: 0 },
     };
-    if (idemKey) {
-      await conn.query(
-        'INSERT INTO idempotency_keys (id_key, status_code, response_body) VALUES (?,?,?)',
-        [idemKey, 201, JSON.stringify(body)]
+
+    if (idempotencyKey) {
+      await conn.execute(
+        'UPDATE idempotency_keys SET status_code = ?, response_body = ? WHERE id_key = ?',
+        [201, JSON.stringify(body), idempotencyKey],
       );
     }
-    await conn.commit();
-    res.status(201).json(body);
-  } catch (err) {
-    await conn.rollback();
-    res.status(500).json({ success: false, message: 'Gagal menyimpan jadwal (rollback).', error: err.message });
-  } finally {
-    conn.release();
+
+    return { body };
+  });
+
+  if (outcome.replay) {
+    return replayStoredResponse(res, idempotencyKey);
   }
-});
+  return res.status(201).json(outcome.body);
+}));
 
-// --- PUT ubah jadwal (admin) ---------------------------------------------
-router.put('/:id', authenticate, requireAdmin, async (req, res) => {
-  const errors = validateSchedule(req.body);
-  if (errors.length) return res.status(400).json({ success: false, message: 'Validasi gagal.', errors });
+// PUT /v1/schedules/:id
+router.put('/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const id = requireId(req.params.id);
+  const schedule = requireValidSchedule(req.body);
 
-  const { subject, teacher, meeting_link, day, start_time, end_time } = req.body;
-  try {
-    const [exists] = await pool.query('SELECT id FROM schedules WHERE id = ?', [req.params.id]);
-    if (!exists.length) return res.status(404).json({ success: false, message: 'Jadwal tidak ditemukan.' });
+  const data = await withTransaction(async (conn) => {
+    const [existing] = await conn.execute('SELECT published FROM schedules WHERE id = ? FOR UPDATE', [id]);
+    if (existing.length === 0) throw new HttpError(404, 'Jadwal tidak ditemukan.');
 
-    const { conflict, conflicting_schedules } = await checkConflict({
-      teacher, meeting_link, day, start_time, end_time, excludeId: req.params.id,
-    });
-    if (conflict) {
-      return res.status(409).json({ success: false, message: 'Jadwal bentrok.', conflicting_schedules });
-    }
+    await assertNoConflict(conn, schedule, id);
 
-    await pool.query(
-      'UPDATE schedules SET subject=?, teacher=?, meeting_link=?, `day`=?, start_time=?, end_time=? WHERE id=?',
-      [subject, teacher, meeting_link, day, start_time, end_time, req.params.id]
+    await conn.execute(
+      'UPDATE schedules SET subject = ?, teacher = ?, meeting_link = ?, `day` = ?, start_time = ?, end_time = ? WHERE id = ?',
+      [schedule.subject, schedule.teacher, schedule.meeting_link, schedule.day, schedule.start_time, schedule.end_time, id],
     );
-    res.json({ success: true, message: 'Jadwal berhasil diperbarui.' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Gagal memperbarui jadwal.', error: err.message });
-  }
-});
 
-// --- DELETE hapus jadwal (admin) -----------------------------------------
-router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
-  try {
-    const [r] = await pool.query('DELETE FROM schedules WHERE id = ?', [req.params.id]);
-    if (r.affectedRows === 0) return res.status(404).json({ success: false, message: 'Jadwal tidak ditemukan.' });
-    res.json({ success: true, message: 'Jadwal berhasil dihapus.' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Gagal menghapus jadwal.', error: err.message });
-  }
-});
+    return { id, ...schedule, published: existing[0].published };
+  });
 
-// --- PUT publikasikan jadwal (admin) -------------------------------------
-router.put('/:id/publish', authenticate, requireAdmin, async (req, res) => {
-  try {
-    const [r] = await pool.query('UPDATE schedules SET published = 1 WHERE id = ?', [req.params.id]);
-    if (r.affectedRows === 0) return res.status(404).json({ success: false, message: 'Jadwal tidak ditemukan.' });
-    res.json({ success: true, message: 'Jadwal berhasil dipublikasikan.' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Gagal mempublikasikan jadwal.', error: err.message });
-  }
-});
+  res.json({ success: true, message: 'Jadwal berhasil diperbarui.', data });
+}));
+
+// DELETE /v1/schedules/:id
+router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const id = requireId(req.params.id);
+  const [result] = await pool.execute('DELETE FROM schedules WHERE id = ?', [id]);
+  if (result.affectedRows === 0) throw new HttpError(404, 'Jadwal tidak ditemukan.');
+  res.json({ success: true, message: 'Jadwal berhasil dihapus.' });
+}));
+
+// PUT /v1/schedules/:id/publish
+router.put('/:id/publish', requireAdmin, asyncHandler(async (req, res) => {
+  const id = requireId(req.params.id);
+  const [result] = await pool.execute('UPDATE schedules SET published = 1 WHERE id = ?', [id]);
+  if (result.affectedRows === 0) throw new HttpError(404, 'Jadwal tidak ditemukan.');
+  res.json({ success: true, message: 'Jadwal berhasil dipublikasikan.' });
+}));
 
 module.exports = router;
