@@ -1,8 +1,4 @@
-/* =====================================================================
-   Jaberkel · Penjadwalan — Stylesheet
-   Palet: indigo/violet (brand) + coral (aksi) di atas kanvas dingin.
-   Font: Plus Jakarta Sans (display) + Inter (teks).
-   ===================================================================== */
+/* Jaberkel schedule UI. Fonts: Plus Jakarta Sans (headings), Inter (body). */
 
 :root {
   --ink:        #1b1b3a;
@@ -44,7 +40,7 @@ body {
 h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
 [hidden] { display: none !important; }
 
-/* ---------- Tombol ---------- */
+/* Buttons */
 .btn {
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 600; font-size: 14px;
@@ -54,6 +50,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
   display: inline-flex; align-items: center; gap: 6px;
 }
 .btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
 .btn--primary { background: var(--grad); color: #fff; box-shadow: 0 8px 18px -8px rgba(99,102,241,.7); }
 .btn--accent  { background: var(--accent); color: #fff; box-shadow: 0 8px 18px -8px rgba(255,122,89,.7); }
 .btn--accent:hover { background: #ff6a45; }
@@ -63,7 +60,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
 .btn--block   { width: 100%; justify-content: center; padding: 13px; }
 .btn--sm      { padding: 7px 12px; font-size: 13px; }
 
-/* ---------- Field ---------- */
+/* Form fields */
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; flex: 1; }
 .field__label { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); letter-spacing: .01em; }
 .field__input {
@@ -74,9 +71,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
 .field__input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,.15); background: #fff; }
 .field__row { display: flex; gap: 12px; }
 
-/* =====================================================================
-   LOGIN
-   ===================================================================== */
+/* Login */
 .login {
   min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr;
 }
@@ -128,9 +123,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
 .chip--admin strong { color: var(--primary); }
 .chip--viewer strong { color: var(--ok); }
 
-/* =====================================================================
-   TOPBAR
-   ===================================================================== */
+/* Top bar */
 .topbar {
   background: var(--surface); border-bottom: 1px solid var(--line);
   padding: 0 28px; height: 64px; display: flex; align-items: center; justify-content: space-between;
@@ -155,9 +148,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
   display: grid; place-items: center; font-family: 'Plus Jakarta Sans'; font-weight: 700; font-size: 14px;
 }
 
-/* =====================================================================
-   MAIN
-   ===================================================================== */
+/* Main layout */
 .main { max-width: 1180px; margin: 0 auto; padding: 30px 28px 60px; }
 
 .pagehead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
@@ -165,7 +156,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
 .pagehead__sub { color: var(--muted); font-size: 14px; margin: 5px 0 0; }
 .pagehead__actions { display: flex; gap: 10px; }
 
-/* Statistik */
+/* Stats */
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
 .stat {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
@@ -175,7 +166,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
 .stat__num { font-family: 'Plus Jakarta Sans'; font-weight: 800; font-size: 30px; line-height: 1; }
 .stat__lbl { color: var(--muted); font-size: 13px; margin-top: 7px; }
 
-/* Kontrol */
+/* Search and view toggle */
 .controls { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
 .search { position: relative; flex: 1; max-width: 420px; }
 .search__icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); }
@@ -191,9 +182,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
 }
 .seg__btn.is-active { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-sm); }
 
-/* =====================================================================
-   BOARD — jadwal mingguan (signature)
-   ===================================================================== */
+/* Weekly timetable */
 .board {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   box-shadow: var(--shadow-sm); padding: 0; overflow-x: auto;
@@ -203,7 +192,6 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
   display: grid; grid-template-columns: 64px repeat(var(--cols, 5), 1fr);
   border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); z-index: 2;
 }
-.timetable__corner { }
 .timetable__day {
   padding: 14px 10px; text-align: center; font-family: 'Plus Jakarta Sans';
   font-weight: 700; font-size: 13.5px; border-left: 1px solid var(--line); color: var(--ink);
@@ -238,9 +226,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
 .board__empty, .listwrap__empty { padding: 60px 20px; text-align: center; color: var(--muted); }
 .board__empty strong, .listwrap__empty strong { display: block; font-family: 'Plus Jakarta Sans'; color: var(--ink); font-size: 16px; margin-bottom: 6px; }
 
-/* =====================================================================
-   LIST VIEW
-   ===================================================================== */
+/* List view */
 .listwrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden; }
 .tbl { width: 100%; border-collapse: collapse; }
 .tbl thead th {
@@ -272,9 +258,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
 .iconbtn--pub:hover { border-color: var(--ok); color: var(--ok); }
 .iconbtn--del:hover { border-color: var(--danger); color: var(--danger); }
 
-/* =====================================================================
-   MODAL
-   ===================================================================== */
+/* Modals */
 .modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; }
 .modal__backdrop { position: absolute; inset: 0; background: rgba(27,27,58,.45); backdrop-filter: blur(2px); }
 .modal__card {
@@ -301,9 +285,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
 .confirm__text { font-size: 15px; margin: 0 0 6px; }
 .confirm__warn { font-size: 13px; color: var(--danger); margin: 0; }
 
-/* =====================================================================
-   TOASTS
-   ===================================================================== */
+/* Toasts */
 .toasts { position: fixed; top: 18px; right: 18px; z-index: 90; display: grid; gap: 10px; }
 .toast {
   background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--primary);
@@ -317,9 +299,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
 .toast span { color: var(--ink-soft); font-size: 13px; }
 @keyframes slidein { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-/* =====================================================================
-   RESPONSIVE
-   ===================================================================== */
+/* Responsive */
 @media (max-width: 880px) {
   .login { grid-template-columns: 1fr; }
   .login__panel { display: none; }
@@ -330,7 +310,7 @@ h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
   .field__row { flex-direction: column; gap: 0; }
 }
 
-/* ---------- Print (Cetak / PDF) ---------- */
+/* Print / PDF export */
 @media print {
   .topbar, .controls, .pagehead__actions, .toasts, .seg { display: none !important; }
   .board { box-shadow: none; border-color: #ccc; }
