@@ -29,12 +29,12 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Demo accounts for local testing only (bcrypt, cost 10):
---   admin / admin123  (admin)
---   siswa / siswa123  (viewer)
+--   admin   / admin123    (admin)
+--   student / student123  (viewer)
 -- Change or remove them before deploying anywhere reachable by others.
 INSERT INTO `users` (`username`, `password_hash`, `full_name`, `role`) VALUES
 ('admin', '$2b$10$1yQlWe2PfedhaG6efNNFo.t2bkhF9F242FBA.HtLjeQ5DdQ/BQ9RK', 'Admin Jaberkel', 'admin'),
-('siswa', '$2b$10$DgX1ybPxcbOptDmKoP2pze8PwD6eZtxFoJ.xManWyO8GLQydc/OMm', 'Andi Ramadhan', 'viewer');
+('student', '$2a$10$hfeT.5m.SNXwNrhB/Lb0KOhdA7e6ruf2AOALFH16zAFb812Pe7iRO', 'Andi Ramadhan', 'viewer');
 
 CREATE TABLE `schedules` (
   `id`           INT AUTO_INCREMENT PRIMARY KEY,
@@ -42,7 +42,7 @@ CREATE TABLE `schedules` (
   `teacher`      VARCHAR(100) NOT NULL,
   `meeting_link` VARCHAR(255) NOT NULL,
   -- ENUM keeps invalid days out and sorts in week order.
-  `day`          ENUM('Senin','Selasa','Rabu','Kamis','Jumat','Sabtu') NOT NULL,
+  `day`          ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday') NOT NULL,
   `start_time`   TIME         NOT NULL,
   `end_time`     TIME         NOT NULL,
   `published`    TINYINT(1)   NOT NULL DEFAULT 0,
@@ -55,16 +55,16 @@ CREATE TABLE `schedules` (
 
 -- Demo data spread over Monday to Friday, with no conflicts.
 INSERT INTO `schedules` (`subject`, `teacher`, `meeting_link`, `day`, `start_time`, `end_time`, `published`) VALUES
-('Matematika Wajib',  'Drs. Bambang Wijaya', 'https://meet.google.com/mtk-wajib-01', 'Senin',  '07:30:00', '09:00:00', 1),
-('Bahasa Inggris',    'Sarah Johnson, M.Pd', 'https://zoom.us/j/88010110',          'Senin',  '10:15:00', '12:00:00', 1),
-('Fisika Dasar',      'Budi Santoso, S.Si',  'https://meet.google.com/fis-dasar',   'Selasa', '08:00:00', '10:00:00', 1),
-('Kimia Organik',     'Dr. Sri Aminah',      'https://meet.jaberkel.id/kimia',      'Selasa', '13:00:00', '15:00:00', 0),
-('Biologi',           'Bu Ani Lestari',      'https://meet.google.com/bio-kelas',   'Rabu',   '07:30:00', '09:30:00', 1),
-('Sejarah Indonesia', 'Budi Santoso, S.Pd',  'https://zoom.us/j/77001230',          'Rabu',   '10:00:00', '11:30:00', 0),
-('Ekonomi',           'Pak Rudi Hartono',    'https://meet.google.com/eko-kelas',   'Kamis',  '08:00:00', '10:00:00', 1),
-('Bahasa Indonesia',  'Ibu Dewi Lestari',    'https://meet.jaberkel.id/bindo',      'Kamis',  '13:00:00', '14:30:00', 1),
-('TPA / Logika',      'Coach Firman',        'https://meet.google.com/tpa-logika',  'Jumat',  '07:00:00', '08:30:00', 1),
-('Seni Budaya',       'Ibu Clara',           'https://zoom.us/j/99002220',          'Jumat',  '09:00:00', '10:30:00', 0);
+('Mathematics',           'Drs. Bambang Wijaya', 'https://meet.google.com/math-01',        'Monday',    '07:30:00', '09:00:00', 1),
+('English',               'Sarah Johnson, M.Pd', 'https://zoom.us/j/88010110',             'Monday',    '10:15:00', '12:00:00', 1),
+('Basic Physics',         'Budi Santoso, S.Si',  'https://meet.google.com/physics-basic',  'Tuesday',   '08:00:00', '10:00:00', 1),
+('Organic Chemistry',     'Dr. Sri Aminah',      'https://meet.jaberkel.id/chemistry',     'Tuesday',   '13:00:00', '15:00:00', 0),
+('Biology',               'Ms. Ani Lestari',     'https://meet.google.com/biology-class',  'Wednesday', '07:30:00', '09:30:00', 1),
+('Indonesian History',    'Budi Santoso, S.Pd',  'https://zoom.us/j/77001230',             'Wednesday', '10:00:00', '11:30:00', 0),
+('Economics',             'Mr. Rudi Hartono',    'https://meet.google.com/economics-class','Thursday',  '08:00:00', '10:00:00', 1),
+('Indonesian Language',   'Ms. Dewi Lestari',    'https://meet.jaberkel.id/indonesian',    'Thursday',  '13:00:00', '14:30:00', 1),
+('Aptitude Test / Logic', 'Coach Firman',        'https://meet.google.com/aptitude-logic', 'Friday',    '07:00:00', '08:30:00', 1),
+('Arts and Culture',      'Ms. Clara',           'https://zoom.us/j/99002220',             'Friday',    '09:00:00', '10:30:00', 0);
 
 -- Stores the response of a POST sent with an Idempotency-Key header so a
 -- retried request returns the same result instead of creating a duplicate.

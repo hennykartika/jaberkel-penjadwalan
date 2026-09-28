@@ -1,7 +1,7 @@
 'use strict';
 
 // Must match the ENUM on schedules.day and the <select> in public/index.html.
-const DAYS = Object.freeze(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']);
+const DAYS = Object.freeze(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
 
 // Column sizes from schema.sql. Checking them here turns a DB error into a 400.
 const MAX_LENGTH = Object.freeze({ subject: 100, teacher: 100, meeting_link: 255 });
@@ -36,14 +36,14 @@ function isHttpUrl(value) {
 function readText(body, field, label, errors) {
   const raw = body[field];
   if (raw !== undefined && raw !== null && typeof raw !== 'string') {
-    errors.push(`${label} harus berupa teks.`);
+    errors.push(`${label} must be a string.`);
     return '';
   }
   const value = (raw || '').trim();
   if (!value) {
-    errors.push(`${label} wajib diisi.`);
+    errors.push(`${label} is required.`);
   } else if (value.length > MAX_LENGTH[field]) {
-    errors.push(`${label} maksimal ${MAX_LENGTH[field]} karakter.`);
+    errors.push(`${label} must be at most ${MAX_LENGTH[field]} characters.`);
   }
   return value;
 }
@@ -51,12 +51,12 @@ function readText(body, field, label, errors) {
 function readTime(body, field, label, errors) {
   const raw = body[field];
   if (raw === undefined || raw === null || raw === '') {
-    errors.push(`${label} wajib diisi.`);
+    errors.push(`${label} is required.`);
     return null;
   }
   const value = normalizeTime(raw);
   if (!value) {
-    errors.push(`${label} harus berformat HH:MM atau HH:MM:SS.`);
+    errors.push(`${label} must use the HH:MM or HH:MM:SS format.`);
   }
   return value;
 }
@@ -69,23 +69,23 @@ function validateSchedule(body) {
   const input = body !== null && typeof body === 'object' ? body : {};
   const errors = [];
 
-  const subject = readText(input, 'subject', 'Mata pelajaran (subject)', errors);
-  const teacher = readText(input, 'teacher', 'Guru (teacher)', errors);
-  const meetingLink = readText(input, 'meeting_link', 'Link kelas online (meeting_link)', errors);
+  const subject = readText(input, 'subject', 'Subject', errors);
+  const teacher = readText(input, 'teacher', 'Teacher', errors);
+  const meetingLink = readText(input, 'meeting_link', 'Meeting link', errors);
   if (meetingLink && meetingLink.length <= MAX_LENGTH.meeting_link && !isHttpUrl(meetingLink)) {
-    errors.push('Link kelas harus berupa URL yang valid (diawali http:// atau https://).');
+    errors.push('Meeting link must be a valid URL starting with http:// or https://.');
   }
 
   const day = typeof input.day === 'string' ? input.day.trim() : '';
   if (!DAYS.includes(day)) {
-    errors.push(`Hari (day) harus salah satu dari: ${DAYS.join(', ')}.`);
+    errors.push(`Day must be one of: ${DAYS.join(', ')}.`);
   }
 
-  const startTime = readTime(input, 'start_time', 'Jam mulai (start_time)', errors);
-  const endTime = readTime(input, 'end_time', 'Jam selesai (end_time)', errors);
+  const startTime = readTime(input, 'start_time', 'Start time', errors);
+  const endTime = readTime(input, 'end_time', 'End time', errors);
   // Safe to compare as strings because both are zero-padded HH:MM:SS.
   if (startTime && endTime && startTime >= endTime) {
-    errors.push('Jam mulai harus lebih awal dari jam selesai.');
+    errors.push('Start time must be earlier than end time.');
   }
 
   return {

@@ -40,10 +40,10 @@ describe('integration (real database)', { skip }, () => {
   }
 
   const slot = (overrides = {}) => ({
-    subject: 'Uji',
-    teacher: 'Guru Uji',
+    subject: 'Test Session',
+    teacher: 'Test Teacher',
     meeting_link: `https://meet.example/${crypto.randomUUID()}`,
-    day: 'Sabtu',
+    day: 'Saturday',
     start_time: '14:00',
     end_time: '15:00',
     ...overrides,
@@ -82,7 +82,7 @@ describe('integration (real database)', { skip }, () => {
     baseUrl = `http://127.0.0.1:${server.address().port}`;
 
     adminToken = await login('admin', 'admin123');
-    viewerToken = await login('siswa', 'siswa123');
+    viewerToken = await login('student', 'student123');
   });
 
   after(async () => {
@@ -106,7 +106,7 @@ describe('integration (real database)', { skip }, () => {
     assert.ok(list.body.count > 0);
     assert.ok(list.body.data.every((s) => s.published === 1));
 
-    const draft = await api('/v1/schedules/4', { token: viewerToken }); // Kimia Organik is a draft
+    const draft = await api('/v1/schedules/4', { token: viewerToken }); // Organic Chemistry is a draft
     assert.equal(draft.status, 404);
 
     const asAdmin = await api('/v1/schedules/4', { token: adminToken });
@@ -127,7 +127,7 @@ describe('integration (real database)', { skip }, () => {
 
   test('concurrent requests for the same slot create exactly one schedule', async () => {
     await warmPool();
-    const teacher = `Guru Paralel ${crypto.randomUUID()}`;
+    const teacher = `Parallel Teacher ${crypto.randomUUID()}`;
     const results = await Promise.all(
       Array.from({ length: 20 }, () =>
         api('/v1/schedules', { method: 'POST', token: adminToken, body: slot({ teacher }) })),
@@ -145,7 +145,7 @@ describe('integration (real database)', { skip }, () => {
   test('concurrent retries with one Idempotency-Key insert once and replay the rest', async () => {
     await warmPool();
     const key = crypto.randomUUID();
-    const body = slot({ teacher: `Guru Idem ${key}`, start_time: '16:00', end_time: '17:00' });
+    const body = slot({ teacher: `Idempotent Teacher ${key}`, start_time: '16:00', end_time: '17:00' });
     const results = await Promise.all(
       Array.from({ length: 10 }, () =>
         api('/v1/schedules', { method: 'POST', token: adminToken, body, headers: { 'Idempotency-Key': key } })),
@@ -158,15 +158,15 @@ describe('integration (real database)', { skip }, () => {
   });
 
   test('update that would clash is rejected and leaves the row unchanged', async () => {
-    // Move Matematika (Senin 07:30-09:00) onto Bahasa Inggris' link at 11:00.
+    // Move Mathematics (Monday 07:30-09:00) onto the English class link at 11:00.
     const res = await api('/v1/schedules/1', {
       method: 'PUT',
       token: adminToken,
       body: {
-        subject: 'Matematika Wajib',
+        subject: 'Mathematics',
         teacher: 'Drs. Bambang Wijaya',
         meeting_link: 'https://zoom.us/j/88010110',
-        day: 'Senin',
+        day: 'Monday',
         start_time: '11:00',
         end_time: '12:00',
       },
@@ -183,10 +183,10 @@ describe('integration (real database)', { skip }, () => {
       method: 'PUT',
       token: adminToken,
       body: {
-        subject: 'Matematika Wajib',
+        subject: 'Mathematics',
         teacher: 'Drs. Bambang Wijaya',
-        meeting_link: 'https://meet.google.com/mtk-wajib-01',
-        day: 'Senin',
+        meeting_link: 'https://meet.google.com/math-01',
+        day: 'Monday',
         start_time: '07:30',
         end_time: '09:15',
       },

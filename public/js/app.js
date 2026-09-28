@@ -5,7 +5,7 @@
 const API_BASE = '/v1';
 
 // Keep in sync with validators/schedule.js and the ENUM in schema.sql.
-const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 // Default visible window of the weekly grid, widened when a session falls outside it.
 const GRID_START_MIN = 7 * 60;
@@ -134,7 +134,7 @@ async function api(path, { method = 'GET', body, headers = {} } = {}) {
   try {
     res = await fetch(API_BASE + path, options);
   } catch {
-    return { ok: false, status: 0, data: { message: 'Tidak dapat terhubung ke server.' } };
+    return { ok: false, status: 0, data: { message: 'Cannot reach the server.' } };
   }
 
   let data = {};
@@ -147,7 +147,7 @@ async function api(path, { method = 'GET', body, headers = {} } = {}) {
   // An expired or invalid token affects every screen, so handle it once here.
   if (res.status === 401 && state.token) {
     logout();
-    toast('Sesi berakhir', 'Silakan login kembali.', 'err');
+    toast('Session expired', 'Please sign in again.', 'err');
   }
 
   return { ok: res.ok, status: res.status, data };
@@ -179,7 +179,7 @@ async function doLogin(username, password) {
   button.disabled = false;
 
   if (!res.ok) {
-    error.textContent = res.data.message || 'Login gagal.';
+    error.textContent = res.data.message || 'Sign-in failed.';
     error.hidden = false;
     return;
   }
@@ -214,7 +214,7 @@ function enterApp() {
   $('#loginScreen').hidden = true;
   $('#app').hidden = false;
   $('#userName').textContent = state.user.name;
-  $('#userRole').textContent = isAdmin() ? 'Administrator' : 'Hanya lihat';
+  $('#userRole').textContent = isAdmin() ? 'Administrator' : 'View only';
   $('#userAvatar').textContent = initials(state.user.name);
   $('#addBtn').hidden = !isAdmin();
   loadSchedules();
@@ -230,7 +230,7 @@ async function loadSchedules() {
   if (seq !== state.loadSeq || res.status === 401) return;
 
   if (!res.ok) {
-    toast('Gagal memuat', res.data.message || 'Terjadi kesalahan.', 'err');
+    toast('Could not load schedules', res.data.message || 'Something went wrong.', 'err');
     return;
   }
   state.schedules = res.data.data || [];
@@ -246,18 +246,18 @@ function renderStats() {
   if (isAdmin()) {
     const published = all.filter((s) => s.published).length;
     cards = [
-      { value: all.length, label: 'Total Jadwal', color: 'var(--primary)' },
-      { value: published, label: 'Terpublikasi', color: 'var(--ok)' },
-      { value: all.length - published, label: 'Masih Draft', color: 'var(--warn)' },
-      { value: teachers, label: 'Guru Terlibat', color: 'var(--accent)' },
+      { value: all.length, label: 'Total Sessions', color: 'var(--primary)' },
+      { value: published, label: 'Published', color: 'var(--ok)' },
+      { value: all.length - published, label: 'Drafts', color: 'var(--warn)' },
+      { value: teachers, label: 'Teachers', color: 'var(--accent)' },
     ];
   } else {
     // Viewers only receive published schedules, so draft counts mean nothing here.
     cards = [
-      { value: all.length, label: 'Total Jadwal', color: 'var(--primary)' },
-      { value: new Set(all.map((s) => s.subject)).size, label: 'Mata Pelajaran', color: 'var(--ok)' },
-      { value: teachers, label: 'Guru Pengajar', color: 'var(--accent)' },
-      { value: new Set(all.map((s) => s.day)).size, label: 'Hari Aktif', color: 'var(--warn)' },
+      { value: all.length, label: 'Total Sessions', color: 'var(--primary)' },
+      { value: new Set(all.map((s) => s.subject)).size, label: 'Subjects', color: 'var(--ok)' },
+      { value: teachers, label: 'Teachers', color: 'var(--accent)' },
+      { value: new Set(all.map((s) => s.day)).size, label: 'Active Days', color: 'var(--warn)' },
     ];
   }
 
@@ -282,8 +282,8 @@ function render() {
 function renderGrid() {
   const board = $('#gridView');
   if (state.schedules.length === 0) {
-    const hint = isAdmin() ? 'Klik "Tambah Jadwal" untuk mulai menyusun.' : 'Jadwal belum tersedia.';
-    board.innerHTML = `<div class="board__empty"><strong>Belum ada jadwal</strong>${hint}</div>`;
+    const hint = isAdmin() ? 'Click "Add Schedule" to create the first one.' : 'No schedules have been published yet.';
+    board.innerHTML = `<div class="board__empty"><strong>No schedules yet</strong>${hint}</div>`;
     return;
   }
 
@@ -303,7 +303,7 @@ function renderGrid() {
   let head = '<div class="timetable__corner"></div>';
   columns.forEach((day) => {
     const count = state.schedules.filter((s) => s.day === day).length;
-    head += `<div class="timetable__day">${escapeHtml(day)}<small>${count} sesi</small></div>`;
+    head += `<div class="timetable__day">${escapeHtml(day)}<small>${count} ${count === 1 ? 'session' : 'sessions'}</small></div>`;
   });
 
   let rail = '';
@@ -334,7 +334,7 @@ function renderGrid() {
              data-id="${Number(ev.id)}">
           ${ev.published ? '' : '<span class="event__draft">DRAFT</span>'}
           <div class="event__subj">${escapeHtml(ev.subject)}</div>
-          <div class="event__meta">Daring · ${escapeHtml(ev.teacher)}</div>
+          <div class="event__meta">Online · ${escapeHtml(ev.teacher)}</div>
           <div class="event__time">${escapeHtml(hhmm(ev.start_time))}–${escapeHtml(hhmm(ev.end_time))}</div>
         </div>`;
     }).join('');
@@ -373,7 +373,7 @@ function layoutLanes(events) {
 function renderList() {
   const wrap = $('#listView');
   if (state.schedules.length === 0) {
-    wrap.innerHTML = '<div class="listwrap__empty"><strong>Belum ada jadwal</strong>Data tidak ditemukan.</div>';
+    wrap.innerHTML = '<div class="listwrap__empty"><strong>No schedules found</strong>Try a different search term.</div>';
     return;
   }
 
@@ -382,16 +382,16 @@ function renderList() {
     const id = Number(s.id);
     const url = safeUrl(s.meeting_link);
     const link = url
-      ? `<a class="linkcell" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Buka kelas ↗</a>`
-      : '<span class="timecell">Link tidak valid</span>';
+      ? `<a class="linkcell" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Join class ↗</a>`
+      : '<span class="timecell">Invalid link</span>';
     const badge = s.published
-      ? '<span class="badge badge--ok">Terpublikasi</span>'
+      ? '<span class="badge badge--ok">Published</span>'
       : '<span class="badge badge--draft">Draft</span>';
     const actions = `
       <div class="rowactions">
-        ${s.published ? '' : `<button class="iconbtn iconbtn--pub" data-pub="${id}">Publikasikan</button>`}
+        ${s.published ? '' : `<button class="iconbtn iconbtn--pub" data-pub="${id}">Publish</button>`}
         <button class="iconbtn" data-edit="${id}">Edit</button>
-        <button class="iconbtn iconbtn--del" data-del="${id}">Hapus</button>
+        <button class="iconbtn iconbtn--del" data-del="${id}">Delete</button>
       </div>`;
 
     return `
@@ -408,8 +408,8 @@ function renderList() {
   wrap.innerHTML = `
     <table class="tbl">
       <thead><tr>
-        <th>Mata Pelajaran</th><th>Link Kelas</th><th>Hari</th><th>Waktu</th>
-        ${admin ? '<th>Status</th><th style="text-align:right">Aksi</th>' : ''}
+        <th>Subject</th><th>Class Link</th><th>Day</th><th>Time</th>
+        ${admin ? '<th>Status</th><th style="text-align:right">Actions</th>' : ''}
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
@@ -423,7 +423,7 @@ function renderList() {
 
 /* Add / edit modal */
 
-function fillForm({ subject = '', teacher = '', meeting_link = '', day = 'Senin', start = '08:00', end = '09:30' }) {
+function fillForm({ subject = '', teacher = '', meeting_link = '', day = 'Monday', start = '08:00', end = '09:30' }) {
   $('#fSubject').value = subject;
   $('#fTeacher').value = teacher;
   $('#fLink').value = meeting_link;
@@ -438,7 +438,7 @@ function openAdd() {
   state.editingId = null;
   // One key per form: a double click or a retried request cannot create two rows.
   state.idempotencyKey = newIdempotencyKey();
-  $('#modalTitle').textContent = 'Tambah Jadwal';
+  $('#modalTitle').textContent = 'Add Schedule';
   fillForm({});
   $('#modal').hidden = false;
   checkLiveConflict();
@@ -449,7 +449,7 @@ function openEdit(id) {
   if (!s) return;
   state.editingId = id;
   state.idempotencyKey = null;
-  $('#modalTitle').textContent = 'Edit Jadwal';
+  $('#modalTitle').textContent = 'Edit Schedule';
   fillForm({ ...s, start: hhmm(s.start_time), end: hhmm(s.end_time) });
   $('#modal').hidden = false;
   checkLiveConflict();
@@ -492,7 +492,7 @@ function checkLiveConflict() {
     hint.hidden = true;
     return;
   }
-  hint.innerHTML = `<strong>Berpotensi bentrok</strong><ul>${conflictList(clashes)}</ul>`;
+  hint.innerHTML = `<strong>Possible conflict</strong><ul>${conflictList(clashes)}</ul>`;
   hint.hidden = false;
 }
 
@@ -526,9 +526,9 @@ async function save() {
   if (res.status === 401) return;
 
   if (res.status === 400) {
-    const messages = res.data.errors || [res.data.message || 'Data tidak valid.'];
+    const messages = res.data.errors || [res.data.message || 'Invalid data.'];
     const error = $('#formError');
-    error.innerHTML = `<strong>Validasi gagal</strong><ul>${messages.map((m) => `<li>${escapeHtml(m)}</li>`).join('')}</ul>`;
+    error.innerHTML = `<strong>Validation failed</strong><ul>${messages.map((m) => `<li>${escapeHtml(m)}</li>`).join('')}</ul>`;
     error.hidden = false;
     return;
   }
@@ -536,18 +536,18 @@ async function save() {
     const hint = $('#conflictHint');
     const items = res.data.conflicting_schedules || [];
     hint.innerHTML = items.length > 0
-      ? `<strong>Ditolak server: jadwal bentrok</strong><ul>${conflictList(items)}</ul>`
-      : `<strong>${escapeHtml(res.data.message || 'Jadwal bentrok.')}</strong>`;
+      ? `<strong>Rejected by the server: schedule conflict</strong><ul>${conflictList(items)}</ul>`
+      : `<strong>${escapeHtml(res.data.message || 'Schedule conflict.')}</strong>`;
     hint.hidden = false;
     return;
   }
   if (!res.ok) {
-    toast(res.status === 403 ? 'Akses ditolak' : 'Gagal', res.data.message || 'Terjadi kesalahan.', 'err');
+    toast(res.status === 403 ? 'Access denied' : 'Save failed', res.data.message || 'Something went wrong.', 'err');
     return;
   }
 
   closeModal();
-  toast(isEdit ? 'Jadwal diperbarui' : 'Jadwal ditambahkan', `${body.subject} · ${body.day} ${body.start_time}`, 'ok');
+  toast(isEdit ? 'Schedule updated' : 'Schedule added', `${body.subject} · ${body.day} ${body.start_time}`, 'ok');
   loadSchedules();
 }
 
@@ -557,7 +557,7 @@ function openConfirm(id) {
   const s = state.schedules.find((item) => item.id === id);
   if (!s) return;
   state.deleteId = id;
-  $('#confirmText').textContent = `"${s.subject}" (${s.day}, ${hhmm(s.start_time)}–${hhmm(s.end_time)}) akan dihapus.`;
+  $('#confirmText').textContent = `"${s.subject}" (${s.day}, ${hhmm(s.start_time)}–${hhmm(s.end_time)}) will be deleted.`;
   $('#confirm').hidden = false;
 }
 
@@ -572,10 +572,10 @@ async function doDelete() {
   closeConfirm();
   if (res.status === 401) return;
   if (!res.ok) {
-    toast('Gagal menghapus', res.data.message || 'Terjadi kesalahan.', 'err');
+    toast('Delete failed', res.data.message || 'Something went wrong.', 'err');
     return;
   }
-  toast('Jadwal dihapus', 'Data berhasil dihapus.', 'ok');
+  toast('Schedule deleted', 'The schedule has been removed.', 'ok');
   loadSchedules();
 }
 
@@ -585,10 +585,10 @@ async function publish(id) {
   const res = await api(`/schedules/${id}/publish`, { method: 'PUT' });
   if (res.status === 401) return;
   if (!res.ok) {
-    toast('Gagal', res.data.message || 'Terjadi kesalahan.', 'err');
+    toast('Publish failed', res.data.message || 'Something went wrong.', 'err');
     return;
   }
-  toast('Jadwal dipublikasikan', 'Sekarang tampil untuk siswa & guru.', 'ok');
+  toast('Schedule published', 'Students and teachers can now see it.', 'ok');
   loadSchedules();
 }
 
